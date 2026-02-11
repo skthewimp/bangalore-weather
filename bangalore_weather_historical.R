@@ -246,8 +246,8 @@ generate_commentary <- function(stats) {
 
 generate_weather_chart <- function(target_year, save_path = NULL, width = 12, height = 6) {
 
-  load('~/Documents/work/data work/bangaloreTemperature.RData')
-  load('~/Documents/work/data work/bangaloreRainfall.RData')
+  load('data/bangaloreTemperature.RData')
+  load('data/bangaloreRainfall.RData')
 
   blrTemp %>%
     filter(!is.na(Temp)) %>%
@@ -412,7 +412,7 @@ args <- commandArgs(trailingOnly = TRUE)
 if (length(args) > 0) {
   years <- as.integer(args)
   for (yr in years) {
-    outfile <- paste0('~/Documents/work/data work/bangalore_weather_', yr, '.png')
+    outfile <- paste0('charts/bangalore_weather_', yr, '.png')
     generate_weather_chart(yr, save_path = outfile)
   }
 }

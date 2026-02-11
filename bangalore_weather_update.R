@@ -7,8 +7,8 @@ require(lubridate)
 
 primKey <- Sys.getenv("OIKOLAB_PRIMARY")
 secKey <- Sys.getenv("OIKOLAB_SECONDARY")
-load('~/Documents/work/data work/bangaloreRainfall.RData')
-load('~/Documents/work/data work/bangaloreTemperature.RData')
+load('data/bangaloreRainfall.RData')
+load('data/bangaloreTemperature.RData')
 
 blrTemp %>%
   filter(!is.na(Temp)) ->
@@ -62,8 +62,8 @@ blrTemp %>%
   bind_rows(blrTempNew) ->
   blrTemp
 
-save(blrTemp, file='~/Documents/work/data work/bangaloreTemperature.RData')
-save(blrRain, file='~/Documents/work/data work/bangaloreRainfall.RData')
+save(blrTemp, file='data/bangaloreTemperature.RData')
+save(blrRain, file='data/bangaloreRainfall.RData')
 
 curr_year <- max(year(blrTemp$DT))
 
