@@ -265,6 +265,9 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
   weather_stats <- compute_weather_stats(blrTemp, blrRain, target_year)
   commentary <- generate_commentary(weather_stats)
 
+  # Month boundary dates for vertical separator lines
+  month_bounds <- as.Date(paste0(curr_year, '-', 2:12, '-01'))
+
   blrTemp %>%
     mutate(
       DT = as.Date(DT),
@@ -290,24 +293,52 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
       Date = make_date(curr_year, Month, Day),
       High2022 = ifelse(is.infinite(High2022),NormalHigh, High2022),
       Low2022 = ifelse(is.infinite(Low2022),NormalHigh, Low2022),
-      Special = case_when(
-        High2022 >= RecordHigh ~ paste("Hottest", format(Date, "%b-%d"), "since 1980"),
-        Low2022 <= RecordLow ~ paste("Coldest", format(Date, "%b-%d"), "since 1980"),
-        .default = ""
-      )
-    ) %>%
-    ggplot() +
-    geom_segment(aes(x = Date, xend = Date, y = RecordLow, yend = RecordHigh), linewidth = 1, col = "#d4cbaa")+
-    geom_segment(aes(x = Date, xend = Date, y = NormalLow, yend = NormalHigh), linewidth = 1, col = '#888888') +
-    geom_segment(aes(x = Date, xend = Date, y = Low2022, yend = High2022), linewidth = 1, col = "#490000",alpha = 0.9) +
-    ggrepel::geom_text_repel(aes(x = Date, y = NormalHigh, label = str_wrap(Special, 10)), size = 2.5, direction = 'y')  +
+      RecHigh = High2022 >= RecordHigh,
+      RecLow = Low2022 <= RecordLow
+    ) -> temp_data
+
+    # Inline visual legend position (upper area, Oct-Nov where temps are lower)
+    leg_x <- as.Date(paste0(curr_year, '-10-20'))
+    leg_lo <- 33
+    leg_nlo <- 34.5
+    leg_alo <- 35.5
+    leg_ahi <- 37
+    leg_nhi <- 38
+    leg_hi <- 39.5
+
+    ggplot(temp_data) +
+    # Month boundary lines
+    geom_vline(xintercept = month_bounds, colour = '#c8c0aa', linewidth = 0.3) +
+    # Data layers
+    geom_segment(aes(x = Date, xend = Date, y = RecordLow, yend = RecordHigh), linewidth = 1, col = "#c8c0aa") +
+    geom_segment(aes(x = Date, xend = Date, y = NormalLow, yend = NormalHigh), linewidth = 1, col = '#9c9280') +
+    geom_segment(aes(x = Date, xend = Date, y = Low2022, yend = High2022), linewidth = 1, col = "#5f3946") +
+    # Record high days (firebrick dots)
+    geom_point(data = temp_data %>% filter(RecHigh), aes(x = Date, y = High2022), col = 'firebrick3', size = 1.5) +
+    # Record low days (blue dots)
+    geom_point(data = temp_data %>% filter(RecLow), aes(x = Date, y = Low2022), col = 'blue3', size = 1.5) +
+    # Inline visual legend — example bar in lower area
+    annotate("segment", x = leg_x, xend = leg_x, y = leg_lo, yend = leg_hi, linewidth = 4, col = "#c8c0aa") +
+    annotate("segment", x = leg_x, xend = leg_x, y = leg_nlo, yend = leg_nhi, linewidth = 4, col = "#9c9280") +
+    annotate("segment", x = leg_x, xend = leg_x, y = leg_alo, yend = leg_ahi, linewidth = 4, col = "#5f3946") +
+    # Legend labels — right side
+    annotate("segment", x = leg_x + 1, xend = leg_x + 12, y = leg_hi, yend = leg_hi, linewidth = 0.3, col = '#3C3C3C') +
+    annotate("text", x = leg_x + 13, y = leg_hi, label = "RECORD HIGH", hjust = 0, size = 2, col = '#3C3C3C') +
+    annotate("segment", x = leg_x + 1, xend = leg_x + 12, y = leg_nhi, yend = leg_nhi, linewidth = 0.3, col = '#3C3C3C') +
+    annotate("text", x = leg_x + 13, y = leg_nhi, label = "NORMAL HIGH", hjust = 0, size = 2, col = '#3C3C3C') +
+    annotate("segment", x = leg_x + 1, xend = leg_x + 12, y = leg_nlo, yend = leg_nlo, linewidth = 0.3, col = '#3C3C3C') +
+    annotate("text", x = leg_x + 13, y = leg_nlo, label = "NORMAL LOW", hjust = 0, size = 2, col = '#3C3C3C') +
+    annotate("segment", x = leg_x + 1, xend = leg_x + 12, y = leg_lo, yend = leg_lo, linewidth = 0.3, col = '#3C3C3C') +
+    annotate("text", x = leg_x + 13, y = leg_lo, label = "RECORD LOW", hjust = 0, size = 2, col = '#3C3C3C') +
+    # Legend label — left side (actual year)
+    annotate("segment", x = leg_x - 1, xend = leg_x - 12, y = (leg_alo + leg_ahi) / 2, yend = (leg_alo + leg_ahi) / 2, linewidth = 0.3, col = '#3C3C3C') +
+    annotate("text", x = leg_x - 13, y = (leg_alo + leg_ahi) / 2, label = paste0(curr_year, "\nTEMPERATURE"), hjust = 1, size = 2, col = '#3C3C3C', lineheight = 0.9) +
+    # Axes
     scale_x_date("", lim = c(floor_date(as.Date(paste0(curr_year, '-01-01')), '1 year'), ceiling_date(as.Date(paste0(curr_year, '-12-31')), '1 year')),  breaks = seq(as.Date(paste0(curr_year, '-01-15')), as.Date(paste0(curr_year, '-12-15')), by = '1 month'), date_labels = '%B', position = 'top', expand = expansion(mult = 0)) +
-    scale_y_continuous("", breaks = seq(10, 42, 4) )  +
-    ggthemes::theme_tufte()  +
-    theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2),  panel.background = element_rect(fill = rgb(0.85, 0.85, 0.75), linewidth = 0), plot.background = element_rect(fill = rgb(0.85, 0.85, 0.75)) ) +
-    annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 38, label = "Temperature", hjust = 0, fontface = 'bold', label.size = NA, size = 3) +
-    annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 37.5, label = str_wrap("Brown bars represent range between the daily high and low", 40), hjust = 0, vjust = 1, label.size = NA, size = 2.5) +
-    annotate("text", x = as.Date(paste0(curr_year, '-09-05')), y = 14, label = str_wrap("Dark grey bars show normal range; Beige show record range", 40), label.size = NA, size = 2.5) ->
+    scale_y_continuous("", breaks = seq(10, 42, 4), labels = function(x) paste0(x, "\u00B0")) +
+    ggthemes::theme_tufte() +
+    theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2), panel.background = element_rect(fill = '#e5e1d8', linewidth = 0), plot.background = element_rect(fill = '#e5e1d8')) +
+    annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 40, label = "Temperature", hjust = 0, fontface = 'bold', size = 3, col = '#3C3C3C') ->
     tempPlot
 
 
@@ -372,17 +403,18 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
       )
     ) %>%
     ggplot(aes(x = DT)) +
-    geom_segment(aes(x = DT, xend = DT, y = CumulRain - Rain, yend = CumulRain), linewidth = 1, col = '#490000') +
-    geom_step(aes(y = MonthlyAvg, group = Month), lwd = 1, col = 'darkgreen') +
-    geom_text(aes(y = MonthlyAvg, label = normalLabel), vjust = -0.05, hjust = 0, size = 2.5, fontface = 'bold') +
-    geom_text(aes(y = CumulRain, label = actualLabel), vjust = -0.05, hjust = 1, size = 2.5, fontface = 'bold') +
-    ggrepel::geom_text_repel(aes(y = CumulRain, label = str_wrap(Label, 10)), size = 2,  fontface = 'bold') +
+    geom_vline(xintercept = month_bounds, colour = '#c8c0aa', linewidth = 0.3) +
+    geom_segment(aes(x = DT, xend = DT, y = CumulRain - Rain, yend = CumulRain), linewidth = 1, col = '#5f3946') +
+    geom_step(aes(y = MonthlyAvg, group = Month), lwd = 1, col = '#9c9280') +
+    geom_text(aes(y = MonthlyAvg, label = normalLabel), vjust = -0.05, hjust = 0, size = 2.5, fontface = 'bold', col = '#3C3C3C') +
+    geom_text(aes(y = CumulRain, label = actualLabel), vjust = -0.05, hjust = 1, size = 2.5, fontface = 'bold', col = '#3C3C3C') +
+    ggrepel::geom_text_repel(aes(y = CumulRain, label = str_wrap(Label, 10)), size = 2, fontface = 'bold', col = '#3C3C3C') +
     scale_x_date("", lim = c(floor_date(as.Date(paste0(curr_year, '-01-01')), '1 year'), ceiling_date(as.Date(paste0(curr_year, '-12-31')), '1 year')),  breaks = seq(as.Date(paste0(curr_year, '-01-15')), as.Date(paste0(curr_year, '-12-15')), by = '1 month'), date_labels = '%B', expand = expansion(mult = 0)) +
     ggthemes::theme_tufte() +
-    theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2), panel.background = element_rect(fill = rgb(0.85, 0.85, 0.75), linewidth = 0), plot.background = element_rect(fill = rgb(0.85, 0.85, 0.75)) ) +
+    theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2), panel.background = element_rect(fill = '#e5e1d8', linewidth = 0), plot.background = element_rect(fill = '#e5e1d8')) +
     scale_y_continuous("", breaks = seq(0,500, 50)) +
-    annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 260, label = "Precipitation", hjust = 0, fontface = 'bold', size = 3) +
-    annotate("text", x = as.Date(paste0(curr_year, '-02-05')), y = 260, label = str_wrap("Cumulative monthly precipitation in mm compared to normal monthly precipitation", 1000), hjust = 0,  size = 2.5)  ->
+    annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 260, label = "Precipitation", hjust = 0, fontface = 'bold', size = 3, col = '#3C3C3C') +
+    annotate("text", x = as.Date(paste0(curr_year, '-02-05')), y = 260, label = str_wrap("Cumulative monthly precipitation in mm compared to normal monthly precipitation", 1000), hjust = 0, size = 2.5, col = '#3C3C3C')  ->
     rainPlot
 
   combined <- tempPlot + rainPlot +
@@ -393,10 +425,11 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
       caption = "Data source: Oikokab"
     ) &
     theme(
-      plot.title = element_text(face = 'bold', hjust = 0),
-      plot.subtitle = element_text(size = 8, color = "#490000", hjust = 0, margin = margin(t = 2, b = 4)),
-      panel.background = element_rect(fill = "#eae4db"),
-      plot.background = element_rect(fill = "#eae4db", linewidth = 0)
+      plot.title = element_text(face = 'bold', hjust = 0, colour = '#3C3C3C'),
+      plot.subtitle = element_text(size = 8, color = "#5f3946", hjust = 0, margin = margin(t = 2, b = 4)),
+      plot.caption = element_text(colour = '#3C3C3C'),
+      panel.background = element_rect(fill = '#e5e1d8'),
+      plot.background = element_rect(fill = '#e5e1d8', linewidth = 0)
     )
 
   if (!is.null(save_path)) {
