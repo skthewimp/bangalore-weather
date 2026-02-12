@@ -337,7 +337,7 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
     scale_x_date("", lim = c(floor_date(as.Date(paste0(curr_year, '-01-01')), '1 year'), ceiling_date(as.Date(paste0(curr_year, '-12-31')), '1 year')),  breaks = seq(as.Date(paste0(curr_year, '-01-15')), as.Date(paste0(curr_year, '-12-15')), by = '1 month'), date_labels = '%B', position = 'top', expand = expansion(mult = 0)) +
     scale_y_continuous("", breaks = seq(10, 42, 4), labels = function(x) paste0(x, "\u00B0")) +
     ggthemes::theme_tufte() +
-    theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2), panel.background = element_rect(fill = '#e5e1d8', linewidth = 0), plot.background = element_rect(fill = '#e5e1d8')) +
+    theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2), panel.background = element_rect(fill = '#e5e1d8', linewidth = 0), plot.background = element_rect(fill = '#e5e1d8')) +
     annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 40, label = "Temperature", hjust = 0, fontface = 'bold', size = 3, col = '#3C3C3C') ->
     tempPlot
 
@@ -411,7 +411,7 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
     ggrepel::geom_text_repel(aes(y = CumulRain, label = str_wrap(Label, 10)), size = 2, fontface = 'bold', col = '#3C3C3C') +
     scale_x_date("", lim = c(floor_date(as.Date(paste0(curr_year, '-01-01')), '1 year'), ceiling_date(as.Date(paste0(curr_year, '-12-31')), '1 year')),  breaks = seq(as.Date(paste0(curr_year, '-01-15')), as.Date(paste0(curr_year, '-12-15')), by = '1 month'), date_labels = '%B', expand = expansion(mult = 0)) +
     ggthemes::theme_tufte() +
-    theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2), panel.background = element_rect(fill = '#e5e1d8', linewidth = 0), plot.background = element_rect(fill = '#e5e1d8')) +
+    theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2), panel.background = element_rect(fill = '#e5e1d8', linewidth = 0), plot.background = element_rect(fill = '#e5e1d8')) +
     scale_y_continuous("", breaks = seq(0,500, 50)) +
     annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 260, label = "Precipitation", hjust = 0, fontface = 'bold', size = 3, col = '#3C3C3C') +
     annotate("text", x = as.Date(paste0(curr_year, '-02-05')), y = 260, label = str_wrap("Cumulative monthly precipitation in mm compared to normal monthly precipitation", 1000), hjust = 0, size = 2.5, col = '#3C3C3C')  ->
