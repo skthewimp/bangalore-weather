@@ -202,60 +202,50 @@ generate_commentary <- function(stats) {
   top_idx <- order(devs, decreasing = TRUE)[1:5]
   top_facts <- paste(sapply(facts[top_idx], function(f) f$text), collapse = "\n")
 
-  system_prompt <- paste0(
-    "Rewrite these 5 weather facts as exactly 4 chart subtitle bullets.\n",
-    "Rules:\n",
-    "- One fact per bullet, under 15 words. Drop the least interesting one.\n",
-    "- Keep all numbers, dates, and periods exactly as given.\n",
-    "- Plain calm tone. No 'unprecedented', 'dramatic', 'remarkable', 'significant', 'notably', 'surpassing'.\n",
-    "- Use \u00B0C for temperatures.\n",
-    "- Format: 4 lines starting with '\u2022 '. Nothing else.\n\n",
-    "Example input:\n",
-    "42 days above 35\u00B0C vs the usual 18\n",
-    "A 47-day dry spell from Jan 03 to Feb 18\n\n",
-    "Example output:\n",
-    "\u2022 42 days crossed 35\u00B0C, more than double the usual 18\n",
-    "\u2022 A 47-day dry spell stretched from early Jan to mid-Feb"
-  )
-
   body <- list(
-    model = "gemma3:4b",
-    messages = list(
-      list(role = "system", content = system_prompt),
-      list(role = "user", content = paste0("Bangalore ", stats$year, " weather facts to rewrite:\n", top_facts))
-    ),
+    model = "claude-haiku-4-5-20251001",
     max_tokens = 300,
-    temperature = 0.3
+    system = paste0(
+      "You are writing a terse chart subtitle for a Bangalore weather visualization for the year ", stats$year, ". ",
+      "You receive weather stats ranked by how unusual they are compared to 40-year historical norms. ",
+      "Write exactly 4 bullets that a Bangalore resident would find interesting. ",
+      "Focus on what stands out - comparisons to normal, streaks, records. Not just restating numbers. ",
+      "Each bullet must be under 15 words, start with '\u2022 ', and use \u00B0C. ",
+      "Plain, calm tone. No hyperbole. Output only the 4 bullets, nothing else."
+    ),
+    messages = list(
+      list(role = "user", content = paste0("Top 5 most unusual Bangalore weather facts for ", stats$year, ":\n", top_facts))
+    )
   )
 
   resp <- tryCatch({
-    request("http://localhost:11434/v1/chat/completions") %>%
+    request("https://api.anthropic.com/v1/messages") %>%
+      req_headers(
+        `x-api-key` = Sys.getenv("ANTHROPIC_API_KEY"),
+        `anthropic-version` = "2023-06-01",
+        `content-type` = "application/json"
+      ) %>%
       req_body_json(body) %>%
-      req_timeout(120) %>%
+      req_timeout(30) %>%
       req_error(is_error = ~ FALSE) %>%
       req_perform()
   }, error = function(e) {
-    message("Ollama call failed: ", e$message, ". Skipping commentary.")
+    message("Claude API call failed: ", e$message, ". Skipping commentary.")
     return(NULL)
   })
 
   if (is.null(resp)) return(NULL)
 
   if (resp_status(resp) != 200) {
-    message("Ollama returned status ", resp_status(resp), ". Skipping commentary.")
+    message("Claude API returned status ", resp_status(resp), ". Skipping commentary.")
     return(NULL)
   }
 
-  result <- resp %>% resp_body_json()
-  raw <- result$choices[[1]]$message$content
-  # Keep only lines starting with bullet character, drop any preamble
+  raw <- resp %>% resp_body_json() %>% .$content %>% .[[1]] %>% .$text
   lines <- strsplit(raw, "\n")[[1]]
   bullet_lines <- lines[grepl("^\u2022", trimws(lines))]
   if (length(bullet_lines) == 0) return(NULL)
-  # Strip banned words the model sometimes sneaks in
-  cleaned <- gsub("\\s*(significantly|notably|remarkably|dramatically|unprecedented)\\s*", " ",
-                   paste(trimws(bullet_lines), collapse = "\n"), ignore.case = TRUE)
-  trimws(gsub("  +", " ", cleaned))
+  paste(trimws(bullet_lines), collapse = "\n")
 }
 
 generate_weather_chart <- function(target_year, save_path = NULL, width = 12, height = 6) {

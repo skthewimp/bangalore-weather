@@ -127,53 +127,55 @@ record_days <- recent_temp %>%
   filter(!is.na(RecHigh) & (High > RecHigh | Low < RecLow)) %>%
   nrow()
 
-recent_facts <- paste(
-  paste0("Avg high: ", round(mean(recent_temp$High), 1), "\u00B0C vs normal ", round(normal_temp$NormalHigh, 1), "\u00B0C"),
-  paste0("Avg low: ", round(mean(recent_temp$Low), 1), "\u00B0C vs normal ", round(normal_temp$NormalLow, 1), "\u00B0C"),
-  paste0("Hottest: ", round(hottest$High, 1), "\u00B0C on ", format(hottest$DT, "%b %d")),
-  paste0("Coldest: ", round(coldest$Low, 1), "\u00B0C on ", format(coldest$DT, "%b %d")),
-  paste0("Rainfall: ", round(total_rain, 0), "mm vs normal ~", round(normal_rain$NormalRain, 0), "mm; ", rainy_days, " rainy days"),
-  if (record_days > 0) paste0(record_days, " days broke all-time records for their date") else NULL,
-  sep = "\n"
-)
-
-system_prompt <- paste0(
-  "Rewrite these recent weather facts as exactly 3 chart subtitle bullets.\n",
-  "Rules:\n",
-  "- One fact per bullet, under 15 words. Merge or drop the least interesting.\n",
-  "- Keep all numbers and dates exactly as given.\n",
-  "- Plain calm tone. No 'unprecedented', 'dramatic', 'remarkable', 'significant', 'notably', 'surpassing'.\n",
-  "- Use \u00B0C for temperatures.\n",
-  "- Format: 3 lines starting with '\u2022 '. Nothing else.\n"
+recent_facts <- paste0(
+  "Period: last ", recent_window, " days ending ", format(Sys.Date(), "%b %d, %Y"), "\n",
+  "Avg daily high: ", round(mean(recent_temp$High), 1), "\u00B0C (normal for these dates: ", round(normal_temp$NormalHigh, 1), "\u00B0C)\n",
+  "Avg daily low: ", round(mean(recent_temp$Low), 1), "\u00B0C (normal: ", round(normal_temp$NormalLow, 1), "\u00B0C)\n",
+  "Hottest day: ", round(hottest$High, 1), "\u00B0C on ", format(hottest$DT, "%b %d"), "\n",
+  "Coldest night: ", round(coldest$Low, 1), "\u00B0C on ", format(coldest$DT, "%b %d"), "\n",
+  "Total rainfall: ", round(total_rain, 0), "mm (normal for these dates: ~", round(normal_rain$NormalRain, 0), "mm)\n",
+  "Rainy days: ", rainy_days, "\n",
+  if (record_days > 0) paste0(record_days, " days broke all-time records (since 1981) for their calendar date\n") else ""
 )
 
 commentary <- tryCatch({
   body <- list(
-    model = "gemma3:4b",
-    messages = list(
-      list(role = "system", content = system_prompt),
-      list(role = "user", content = paste0("Bangalore weather, last ", recent_window, " days (ending ", format(Sys.Date(), "%b %d"), "):\n", recent_facts))
-    ),
+    model = "claude-haiku-4-5-20251001",
     max_tokens = 200,
-    temperature = 0.3
+    system = paste0(
+      "You are writing a terse chart subtitle for a Bangalore weather visualization. ",
+      "You receive weather stats for the last ~2 weeks compared to 40-year historical norms. ",
+      "Write exactly 3 bullets that a Bangalore resident would find interesting. ",
+      "Focus on what is unusual or noteworthy - not just restating numbers. ",
+      "Compare to what is normal for this time of year. Mention if it has been warmer/cooler/drier/wetter than usual and by how much. ",
+      "Each bullet must be under 15 words, start with '\u2022 ', and use \u00B0C. ",
+      "Plain, calm tone. No hyperbole. Output only the 3 bullets, nothing else."
+    ),
+    messages = list(
+      list(role = "user", content = paste0("Bangalore weather stats:\n", recent_facts))
+    )
   )
-  resp <- request("http://localhost:11434/v1/chat/completions") %>%
+  resp <- request("https://api.anthropic.com/v1/messages") %>%
+    req_headers(
+      `x-api-key` = Sys.getenv("ANTHROPIC_API_KEY"),
+      `anthropic-version` = "2023-06-01",
+      `content-type` = "application/json"
+    ) %>%
     req_body_json(body) %>%
-    req_timeout(120) %>%
+    req_timeout(30) %>%
     req_error(is_error = ~ FALSE) %>%
     req_perform()
-  if (resp_status(resp) != 200) { NULL } else {
-    raw <- resp %>% resp_body_json() %>% .$choices %>% .[[1]] %>% .$message %>% .$content
+  if (resp_status(resp) != 200) {
+    message("Claude API returned status ", resp_status(resp), ". Skipping commentary.")
+    NULL
+  } else {
+    raw <- resp %>% resp_body_json() %>% .$content %>% .[[1]] %>% .$text
     lines <- strsplit(raw, "\n")[[1]]
     bullet_lines <- lines[grepl("^\u2022", trimws(lines))]
     if (length(bullet_lines) == 0) NULL
-    else {
-      cleaned <- gsub("\\s*(significantly|notably|remarkably|dramatically|unprecedented)\\s*", " ",
-                       paste(trimws(bullet_lines), collapse = "\n"), ignore.case = TRUE)
-      trimws(gsub("  +", " ", cleaned))
-    }
+    else paste(trimws(bullet_lines), collapse = "\n")
   }
-}, error = function(e) { message("Ollama call failed: ", e$message); NULL })
+}, error = function(e) { message("Claude API call failed: ", e$message); NULL })
 
 
 blrTemp %>%
