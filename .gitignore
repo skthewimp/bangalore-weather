@@ -3,3 +3,17 @@
 .RData
 .Rproj.user
 .DS_Store
+Rplots.pdf
+*.nb.html
+*.zip
+Climate and Weather Data/
+allindiarainfall.*
+blrmaxmin.jpg
+blrmaxtemp.csv
+blrmintemp.csv
+blrrainfall.csv
+blrrainfall.jpg
+blr_temp_sample.csv
+blrWeather.*
+blrWeatherAnalysis.*
+bangalore_winter_analysis.*
