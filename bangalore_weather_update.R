@@ -1,6 +1,8 @@
 library(tidytable)
 library(tidyverse)
 library(patchwork)
+library(ggthemes)
+library(ggrepel)
 library(yaml)
 library(rvest)
 library(lubridate)
@@ -298,7 +300,7 @@ blrRain %>%
   annotate("text", x = as.Date(paste0(curr_year, '-02-05')), y = 260, label = str_wrap("Cumulative monthly precipitation in mm compared to normal monthly precipitation", 1000), hjust = 0,  size = 2.5)  ->
   rainPlot
 
-tempPlot + rainPlot +
+combined <- tempPlot + rainPlot +
   plot_layout(ncol = 1, heights = c(70, 30)) +
   plot_annotation(
     title = paste("Bangalore's Weather in", curr_year),
@@ -311,4 +313,8 @@ tempPlot + rainPlot +
     panel.background = element_rect(fill = "#eae4db"),
     plot.background = element_rect(fill = "#eae4db", linewidth = 0)
   )
+
+outfile <- file.path(script_dir, 'charts', paste0('bangalore_weather_', format(Sys.Date(), '%Y%m%d'), '.png'))
+ggsave(outfile, combined, width = 12, height = 6)
+message("Saved: ", outfile)
 
