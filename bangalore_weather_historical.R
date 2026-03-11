@@ -248,7 +248,7 @@ generate_commentary <- function(stats) {
   paste(trimws(bullet_lines), collapse = "\n")
 }
 
-generate_weather_chart <- function(target_year, save_path = NULL, width = 12, height = 6) {
+generate_weather_chart <- function(target_year, save_path = NULL, width = 12, height = 6, commentary = NULL) {
 
   load(file.path(.script_dir, 'data', 'bangaloreTemperature.RData'))
   load(file.path(.script_dir, 'data', 'bangaloreRainfall.RData'))
@@ -265,9 +265,11 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
 
   curr_year <- target_year
 
-  # Compute stats and generate AI commentary
-  weather_stats <- compute_weather_stats(blrTemp, blrRain, target_year)
-  commentary <- generate_commentary(weather_stats)
+  # Compute stats and generate AI commentary (skip if commentary was passed in)
+  if (is.null(commentary)) {
+    weather_stats <- compute_weather_stats(blrTemp, blrRain, target_year)
+    commentary <- generate_commentary(weather_stats)
+  }
 
   blrTemp %>%
     mutate(
