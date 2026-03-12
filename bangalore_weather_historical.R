@@ -1,9 +1,11 @@
 require(tidytable)
 require(tidyverse)
-require(patchwork)
+require(shadowtext)
+require(ggtext)
 require(lubridate)
 require(httr2)
 require(jsonlite)
+require(patchwork)
 
 .script_dir <- tryCatch({
   dirname(normalizePath(sys.frame(1)$ofile, mustWork = FALSE))
@@ -311,8 +313,11 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
     scale_y_continuous("", breaks = seq(10, 42, 4) )  +
     ggthemes::theme_tufte()  +
     theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2),  panel.background = element_rect(fill = rgb(0.85, 0.85, 0.75), linewidth = 0), plot.background = element_rect(fill = rgb(0.85, 0.85, 0.75)) ) +
+    annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 38, label = "Temperature", hjust = 0, fontface = 'bold', size = 3.2, color = "#eae4db") +
     annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 38, label = "Temperature", hjust = 0, fontface = 'bold', size = 3) +
+    annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 37.5, label = str_wrap("Brown bars represent range between the daily high and low", 40), hjust = 0, vjust = 1, size = 2.7, color = "#eae4db") +
     annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 37.5, label = str_wrap("Brown bars represent range between the daily high and low", 40), hjust = 0, vjust = 1, size = 2.5) +
+    annotate("text", x = as.Date(paste0(curr_year, '-09-05')), y = 14, label = str_wrap("Dark grey bars show normal range; Beige show record range", 40), size = 2.7, color = "#eae4db") +
     annotate("text", x = as.Date(paste0(curr_year, '-09-05')), y = 14, label = str_wrap("Dark grey bars show normal range; Beige show record range", 40), size = 2.5) ->
     tempPlot
 
@@ -327,6 +332,7 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
       .by = DT
     ) %>%
     mutate(
+      Year = year(DT),
       Month = month(DT),
       Day = day(DT),
       MonthYear = floor_date(DT, '1 month')
@@ -345,10 +351,19 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
       MonthlyMax = max(MonthlyRain),
       .by = Month
     ) %>%
-    filter(year(DT) == curr_year) %>%
     arrange(DT) %>%
     mutate(
-      CumulRain = cumsum(Rain),
+      CumulRainYM = cumsum(Rain),
+      .by = c(Year, Month)
+    ) %>%
+    mutate(
+      CumulMin = quantile(CumulRainYM, 0.10),
+      CumulMax = quantile(CumulRainYM, 0.90),
+      .by = c(Month, Day)
+    ) %>%
+    filter(Year == curr_year) %>%
+    mutate(
+      CumulRain = CumulRainYM,
       CumulAvg = cumsum(DailyAvg),
       .by = Month
     ) %>%
@@ -378,6 +393,7 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
       )
     ) %>%
     ggplot(aes(x = DT)) +
+    geom_ribbon(aes(ymin = CumulMin, ymax = CumulMax, group = Month), fill = "#888888", alpha = 0.3) +
     geom_segment(aes(x = DT, xend = DT, y = CumulRain - Rain, yend = CumulRain), linewidth = 1, col = '#490000') +
     geom_step(aes(y = MonthlyAvg, group = Month), lwd = 1, col = 'darkgreen') +
     geom_text(aes(y = MonthlyAvg, label = normalLabel), vjust = -0.05, hjust = 0, size = 2.5, fontface = 'bold') +
@@ -388,7 +404,7 @@ generate_weather_chart <- function(target_year, save_path = NULL, width = 12, he
     theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold'), axis.line.y = element_line(colour = 'black', linewidth = 0.2), panel.background = element_rect(fill = rgb(0.85, 0.85, 0.75), linewidth = 0), plot.background = element_rect(fill = rgb(0.85, 0.85, 0.75)) ) +
     scale_y_continuous("", breaks = seq(0,500, 50)) +
     annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 260, label = "Precipitation", hjust = 0, fontface = 'bold', size = 3) +
-    annotate("text", x = as.Date(paste0(curr_year, '-02-05')), y = 260, label = str_wrap("Cumulative monthly precipitation in mm compared to normal monthly precipitation", 1000), hjust = 0,  size = 2.5)  ->
+    annotate("text", x = as.Date(paste0(curr_year, '-02-05')), y = 260, label = str_wrap("Cumulative monthly precipitation vs normal. Beige band shows historical range", 1000), hjust = 0,  size = 2.5)  ->
     rainPlot
 
   combined <- tempPlot + rainPlot +
