@@ -1,0 +1,467 @@
+---
+title: "Bangalore Temperature by Time of Day"
+subtitle: "When does summer vs winter matter most?"
+output: html_notebook
+---
+
+```{r setup, message=FALSE}
+require(tidytable)
+require(tidyverse)
+require(lubridate)
+require(patchwork)
+require(ggthemes)
+require(ggrepel)
+
+load('/Users/Karthik/Documents/work/data work/bangalore/weather/data/bangaloreTemperature.RData')
+
+blrTemp %>%
+  filter(!is.na(Temp)) %>%
+  mutate(
+    Temp = as.numeric(Temp),
+    Hour = hour(DT),
+    Year = year(DT),
+    Month = month(DT),
+    Day = day(DT),
+    Date = as.Date(DT)
+  ) ->
+  blrTemp
+```
+
+The data is hourly temperature from 1981 to 2026, sourced from ERA5 via Oikolab. Timestamps are IST.
+
+## Defining seasons
+
+Bangalore doesn't map onto the textbook four-season model. February in particular gets lumped into "winter" by convention, but the data says otherwise - mean highs jump from 27.4 C in January to 29.8 C in February, and it's the driest month of the year (3.3 rainy days). It's the beginning of summer, not the end of winter.
+
+A data-driven classification using both temperature and rainfall:
+
+- **Winter**: Dec-Jan (coolest lows at 16-16.3 C, dry)
+- **Hot/dry**: Feb-Apr (rapid heating through to peak in April, mostly dry)
+- **Pre-monsoon**: May (still hot but rain arrives hard - 123mm, 23 rainy days)
+- **Monsoon**: Jun-Sep (wet, moderated temperatures)
+- **Post-monsoon**: Oct-Nov (retreating rain, cooling)
+
+```{r season-definition}
+blrTemp %>%
+  mutate(
+    Season = case_when(
+      Month %in% c(12, 1) ~ "Winter",
+      Month %in% c(2, 3, 4) ~ "Hot/dry",
+      Month == 5 ~ "Pre-monsoon",
+      Month %in% c(6, 7, 8, 9) ~ "Monsoon",
+      Month %in% c(10, 11) ~ "Post-monsoon"
+    )
+  ) ->
+  blrTemp
+```
+
+
+## Average temperature by hour and season
+
+First, the basic question: what does the diurnal cycle look like in each season?
+
+```{r hourly-season-avg, fig.width=10, fig.height=5}
+blrTemp %>%
+  summarise(
+    MeanTemp = mean(Temp),
+    .by = c(Hour, Season)
+  ) %>%
+  mutate(Season = factor(Season, levels = c("Winter", "Hot/dry", "Pre-monsoon", "Monsoon", "Post-monsoon"))) ->
+  hourly_season
+
+hourly_season %>%
+  ggplot(aes(x = Hour, y = MeanTemp, color = Season)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 1.5) +
+  scale_x_continuous(breaks = seq(0, 23, 3), labels = paste0(seq(0, 23, 3), ":00")) +
+  scale_y_continuous(breaks = seq(16, 32, 2)) +
+  scale_color_manual(values = c(
+    "Winter" = "#2255AA",
+    "Hot/dry" = "#CD3333",
+    "Pre-monsoon" = "#E69F00",
+    "Monsoon" = "#228B22",
+    "Post-monsoon" = "#9c9280"
+  )) +
+  ggthemes::theme_tufte() +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    plot.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    axis.text = element_text(face = 'bold', color = '#3C3C3C'),
+    axis.line.y = element_line(colour = 'black', linewidth = 0.2),
+    axis.ticks.x = element_blank(),
+    legend.position = 'bottom',
+    legend.title = element_blank(),
+    plot.margin = margin(15, 15, 15, 15)
+  ) +
+  labs(
+    title = "Bangalore's Diurnal Temperature Cycle by Season",
+    subtitle = "Average hourly temperature, 1981-2026",
+    x = "", y = "Temperature (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab"
+  )
+```
+
+
+## The hot-dry vs winter gap by hour
+
+At which hour of the day is the gap between the hottest season (Feb-Apr) and winter (Dec-Jan) the largest?
+
+```{r summer-winter-gap, fig.width=10, fig.height=5}
+hourly_season %>%
+  filter(Season %in% c("Hot/dry", "Winter")) %>%
+  pivot_wider(names_from = Season, values_from = MeanTemp) %>%
+  mutate(Gap = `Hot/dry` - Winter) ->
+  sw_gap
+
+max_gap_hour <- sw_gap %>% slice_max(Gap, n = 1)
+min_gap_hour <- sw_gap %>% slice_min(Gap, n = 1)
+
+sw_gap %>%
+  ggplot(aes(x = Hour, y = Gap)) +
+  geom_col(fill = "#5f3946", width = 0.7) +
+  geom_text(
+    aes(label = round(Gap, 1)),
+    vjust = -0.5, size = 3, fontface = 'bold', color = '#3C3C3C'
+  ) +
+  geom_text(
+    data = max_gap_hour,
+    aes(label = paste0("Biggest gap: ", round(Gap, 1), "\u00B0C at ", Hour, ":00")),
+    vjust = -2, size = 3.5, fontface = 'bold', color = '#CD3333'
+  ) +
+  scale_x_continuous(breaks = 0:23, labels = paste0(0:23, ":00")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  ggthemes::theme_tufte() +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    plot.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    axis.text = element_text(face = 'bold', color = '#3C3C3C'),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+    axis.line.y = element_line(colour = 'black', linewidth = 0.2),
+    axis.ticks.x = element_blank(),
+    legend.position = 'none',
+    plot.margin = margin(15, 15, 15, 15)
+  ) +
+  labs(
+    title = "Hot Season vs Winter Temperature Gap by Hour of Day",
+    subtitle = "Difference between hot/dry (Feb-Apr) and winter (Dec-Jan) average temperature at each hour",
+    x = "", y = "Gap (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab, 1981-2026"
+  )
+```
+
+
+## How has the gap changed over the decades?
+
+Is the summer-winter contrast shrinking or growing? Let's check by decade.
+
+```{r gap-by-decade, fig.width=12, fig.height=6}
+blrTemp %>%
+  mutate(
+    Decade = paste0(floor(Year / 10) * 10, "s")
+  ) %>%
+  filter(Season %in% c("Hot/dry", "Winter")) %>%
+  summarise(
+    MeanTemp = mean(Temp),
+    .by = c(Hour, Season, Decade)
+  ) %>%
+  pivot_wider(names_from = Season, values_from = MeanTemp) %>%
+  mutate(Gap = `Hot/dry` - Winter) %>%
+  filter(Decade != "2020s" | TRUE) -> # keep all decades
+  gap_decades
+
+gap_decades %>%
+  ggplot(aes(x = Hour, y = Gap, color = Decade)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 1.2) +
+  scale_x_continuous(breaks = seq(0, 23, 3), labels = paste0(seq(0, 23, 3), ":00")) +
+  scale_color_brewer(palette = "Set1") +
+  ggthemes::theme_tufte() +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    plot.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    axis.text = element_text(face = 'bold', color = '#3C3C3C'),
+    axis.line.y = element_line(colour = 'black', linewidth = 0.2),
+    axis.ticks.x = element_blank(),
+    legend.position = 'bottom',
+    legend.title = element_blank(),
+    plot.margin = margin(15, 15, 15, 15)
+  ) +
+  labs(
+    title = "Hot/Dry vs Winter Gap by Hour: Has It Changed?",
+    subtitle = "Comparing the diurnal hot-season-to-winter contrast across decades",
+    x = "", y = "Gap (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab"
+  )
+```
+
+
+## Temperature at key hours through the year
+
+Let's pick a few representative hours and see how temperature at those hours varies month by month. This shows which hours "feel" the seasons most.
+
+```{r monthly-by-hour, fig.width=12, fig.height=7}
+key_hours <- c(6, 10, 14, 18, 22)
+
+blrTemp %>%
+  filter(Hour %in% key_hours) %>%
+  summarise(
+    MeanTemp = mean(Temp),
+    P10 = quantile(Temp, 0.10),
+    P90 = quantile(Temp, 0.90),
+    .by = c(Month, Hour)
+  ) %>%
+  mutate(
+    HourLabel = paste0(Hour, ":00"),
+    MonthName = month.abb[Month]
+  ) ->
+  monthly_hour
+
+monthly_hour %>%
+  mutate(HourLabel = factor(HourLabel, levels = paste0(key_hours, ":00"))) %>%
+  ggplot(aes(x = factor(Month, labels = month.abb), y = MeanTemp, group = 1)) +
+  geom_ribbon(aes(ymin = P10, ymax = P90), fill = "#9c9280", alpha = 0.3) +
+  geom_line(color = "#5f3946", linewidth = 1) +
+  geom_point(color = "#5f3946", size = 1.5) +
+  facet_wrap(~HourLabel, nrow = 1) +
+  ggthemes::theme_tufte() +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    plot.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    axis.text = element_text(face = 'bold', color = '#3C3C3C'),
+    axis.text.x = element_text(size = 6, angle = 45, hjust = 1),
+    axis.line.y = element_line(colour = 'black', linewidth = 0.2),
+    axis.ticks.x = element_blank(),
+    strip.text = element_text(face = 'bold', hjust = 0),
+    legend.position = 'none',
+    plot.margin = margin(15, 15, 15, 15)
+  ) +
+  labs(
+    title = "Monthly Temperature at Different Hours of Day",
+    subtitle = "Line = mean, band = 10th-90th percentile range. Early morning shows the sharpest seasonal swing.",
+    x = "", y = "Temperature (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab, 1981-2026"
+  )
+```
+
+
+## Seasonal range: which hour has the widest annual temperature spread?
+
+Instead of just summer vs winter, let's look at the full range (max month avg - min month avg) at each hour.
+
+```{r annual-range-by-hour, fig.width=10, fig.height=5}
+blrTemp %>%
+  summarise(
+    MeanTemp = mean(Temp),
+    .by = c(Month, Hour)
+  ) %>%
+  summarise(
+    MaxMonthly = max(MeanTemp),
+    MinMonthly = min(MeanTemp),
+    Range = max(MeanTemp) - min(MeanTemp),
+    HottestMonth = month.abb[Month[which.max(MeanTemp)]],
+    CoolestMonth = month.abb[Month[which.min(MeanTemp)]],
+    .by = Hour
+  ) ->
+  hour_range
+
+peak_hour <- hour_range %>% slice_max(Range, n = 1)
+
+hour_range %>%
+  ggplot(aes(x = Hour)) +
+  geom_segment(aes(xend = Hour, y = MinMonthly, yend = MaxMonthly), linewidth = 3, color = "#9c9280") +
+  geom_point(aes(y = MaxMonthly), size = 3, color = "#CD3333") +
+  geom_point(aes(y = MinMonthly), size = 3, color = "#2255AA") +
+  geom_text(aes(y = MaxMonthly, label = HottestMonth), vjust = -0.8, size = 2.5, fontface = 'bold', color = '#CD3333') +
+  geom_text(aes(y = MinMonthly, label = CoolestMonth), vjust = 1.5, size = 2.5, fontface = 'bold', color = '#2255AA') +
+  geom_text(
+    data = peak_hour,
+    aes(y = MaxMonthly + 1.5, label = paste0("Widest range: ", round(Range, 1), "\u00B0C")),
+    size = 3.2, fontface = 'bold', color = '#3C3C3C'
+  ) +
+  scale_x_continuous(breaks = 0:23, labels = paste0(0:23, ":00")) +
+  ggthemes::theme_tufte() +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    plot.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    axis.text = element_text(face = 'bold', color = '#3C3C3C'),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+    axis.line.y = element_line(colour = 'black', linewidth = 0.2),
+    axis.ticks.x = element_blank(),
+    legend.position = 'none',
+    plot.margin = margin(15, 15, 15, 15)
+  ) +
+  labs(
+    title = "Annual Temperature Range by Hour of Day",
+    subtitle = "Segment spans from the coolest to hottest month's average. Red = hottest month, Blue = coolest.",
+    x = "", y = "Temperature (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab, 1981-2026"
+  )
+```
+
+
+## Heatmap: hour vs month
+
+A full picture - average temperature at every hour-month combination.
+
+```{r heatmap, fig.width=10, fig.height=6}
+blrTemp %>%
+  summarise(
+    MeanTemp = mean(Temp),
+    .by = c(Month, Hour)
+  ) %>%
+  ggplot(aes(x = factor(Month, labels = month.abb), y = factor(Hour), fill = MeanTemp)) +
+  geom_tile(color = "#e5e1d8", linewidth = 0.5) +
+  scale_fill_viridis_c(option = "B", name = "\u00B0C") +
+  ggthemes::theme_tufte() +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    plot.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    axis.text = element_text(face = 'bold', color = '#3C3C3C'),
+    axis.ticks = element_blank(),
+    legend.position = 'bottom',
+    legend.title = element_text(face = 'bold', color = '#3C3C3C'),
+    plot.margin = margin(15, 15, 15, 15)
+  ) +
+  labs(
+    title = "Hour x Month Temperature Heatmap",
+    subtitle = "Average temperature at each hour for each month. The hottest slot is afternoon in April.",
+    x = "", y = "Hour of Day (IST)",
+    caption = "Data: ERA5 via Oikolab, 1981-2026"
+  )
+```
+
+
+## Has any particular time of day warmed faster?
+
+The warming trend might not be uniform across the day. Let's check the decadal trend at each hour.
+
+```{r warming-by-hour, fig.width=12, fig.height=6}
+blrTemp %>%
+  filter(Year >= 1981, Year <= 2025) %>%
+  summarise(
+    MeanTemp = mean(Temp),
+    .by = c(Year, Hour)
+  ) ->
+  yearly_hour
+
+yearly_hour %>%
+  group_by(Hour) %>%
+  summarise(
+    Slope = coef(lm(MeanTemp ~ Year))[2] * 10,  # degrees per decade
+    .groups = 'drop'
+  ) ->
+  warming_rates
+
+fastest <- warming_rates %>% slice_max(Slope, n = 1)
+slowest <- warming_rates %>% slice_min(Slope, n = 1)
+
+warming_rates %>%
+  ggplot(aes(x = Hour, y = Slope)) +
+  geom_col(fill = "#5f3946", width = 0.7) +
+  geom_text(
+    aes(label = paste0("+", round(Slope, 2), "\u00B0")),
+    vjust = -0.5, size = 2.8, fontface = 'bold', color = '#3C3C3C'
+  ) +
+  geom_hline(yintercept = mean(warming_rates$Slope), linetype = 'dashed', color = '#CD3333', linewidth = 0.5) +
+  annotate("text", x = 22, y = mean(warming_rates$Slope) + 0.015,
+           label = paste0("Overall avg: +", round(mean(warming_rates$Slope), 2), "\u00B0C/decade"),
+           size = 2.8, fontface = 'bold', color = '#CD3333') +
+  scale_x_continuous(breaks = 0:23, labels = paste0(0:23, ":00")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  ggthemes::theme_tufte() +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    plot.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    axis.text = element_text(face = 'bold', color = '#3C3C3C'),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+    axis.line.y = element_line(colour = 'black', linewidth = 0.2),
+    axis.ticks.x = element_blank(),
+    legend.position = 'none',
+    plot.margin = margin(15, 15, 15, 15)
+  ) +
+  labs(
+    title = "Warming Rate by Hour of Day",
+    subtitle = "Linear trend in degrees C per decade, 1981-2025. Are nights warming faster than afternoons?",
+    x = "", y = "Warming (\u00B0C per decade)",
+    caption = "Data: ERA5 via Oikolab"
+  )
+```
+
+
+## Nighttime lows: the disappearing cool
+
+One of the most noticed effects in tropical cities - nighttime minimum temperatures creeping up. Let's look at winter nights specifically.
+
+```{r winter-night-trend, fig.width=10, fig.height=5}
+blrTemp %>%
+  filter(Season == "Winter", Hour %in% c(3, 4, 5, 6)) %>%
+  summarise(
+    MeanTemp = mean(Temp),
+    .by = Year
+  ) %>%
+  filter(Year >= 1981, Year <= 2025) ->
+  winter_night
+
+winter_night_lm <- lm(MeanTemp ~ Year, data = winter_night)
+slope_val <- round(coef(winter_night_lm)[2] * 10, 2)
+
+winter_night %>%
+  ggplot(aes(x = Year, y = MeanTemp)) +
+  geom_point(color = "#2255AA", size = 2) +
+  geom_smooth(method = 'lm', se = FALSE, color = "#CD3333", linewidth = 0.8, linetype = 'dashed') +
+  geom_text_repel(
+    data = winter_night %>% filter(MeanTemp == min(MeanTemp) | MeanTemp == max(MeanTemp)),
+    aes(label = paste0(Year, ": ", round(MeanTemp, 1), "\u00B0C")),
+    size = 3, fontface = 'bold', color = '#3C3C3C'
+  ) +
+  annotate("text", x = 2005, y = min(winter_night$MeanTemp) - 0.3,
+           label = paste0("Trend: +", slope_val, "\u00B0C per decade"),
+           size = 3.5, fontface = 'bold', color = '#CD3333') +
+  ggthemes::theme_tufte() +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    plot.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+    axis.text = element_text(face = 'bold', color = '#3C3C3C'),
+    axis.line.y = element_line(colour = 'black', linewidth = 0.2),
+    axis.ticks.x = element_blank(),
+    legend.position = 'none',
+    plot.margin = margin(15, 15, 15, 15)
+  ) +
+  labs(
+    title = "Winter Pre-dawn Temperature Trend (3:00-6:00 AM)",
+    subtitle = "Average temperature during the coldest hours of winter nights, by year",
+    x = "", y = "Temperature (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  )
+```
+
+
+## Summary
+
+```{r summary-stats}
+cat("KEY FINDINGS\n")
+cat("============\n\n")
+
+cat("1. Hot/dry vs Winter gap by hour:\n")
+cat("   Biggest gap: ", round(max_gap_hour$Gap, 1), "\u00B0C at ", max_gap_hour$Hour, ":00\n")
+cat("   Smallest gap:", round(min_gap_hour$Gap, 1), "\u00B0C at ", min_gap_hour$Hour, ":00\n\n")
+
+cat("2. Annual temperature range by hour:\n")
+cat("   Hour with widest range:", peak_hour$Hour, ":00 -", round(peak_hour$Range, 1), "\u00B0C\n")
+cat("   Hottest month at that hour:", peak_hour$HottestMonth, "\n")
+cat("   Coolest month at that hour:", peak_hour$CoolestMonth, "\n\n")
+
+cat("3. Warming rates:\n")
+cat("   Fastest warming hour:", fastest$Hour, ":00 at +", round(fastest$Slope, 2), "\u00B0C/decade\n")
+cat("   Slowest warming hour:", slowest$Hour, ":00 at +", round(slowest$Slope, 2), "\u00B0C/decade\n\n")
+
+cat("4. Winter pre-dawn (3-6 AM) warming: +", slope_val, "\u00B0C/decade\n")
+```

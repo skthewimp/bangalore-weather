@@ -27,6 +27,7 @@ primKey <- Sys.getenv("OIKOLAB_PRIMARY")
 secKey <- Sys.getenv("OIKOLAB_SECONDARY")
 load(file.path(script_dir, 'data', 'bangaloreRainfall.RData'))
 load(file.path(script_dir, 'data', 'bangaloreTemperature.RData'))
+load(file.path(script_dir, 'data', 'bangaloreWind.RData'))
 
 blrTemp %>%
   filter(!is.na(Temp)) ->
@@ -35,6 +36,10 @@ blrTemp %>%
 blrRain %>%
   filter(!is.na(Rain)) -> 
   blrRain
+
+blrWind %>%
+  filter(!is.na(Wind)) ->
+  blrWind
 
 startDate <-  str_sub(max(blrTemp$DT), 1, 19) %>% str_replace_all(" ", "T")
 endDate <- paste0(Sys.Date(), 'T00:00:00')
@@ -80,8 +85,44 @@ if (as.POSIXct(startDate, format = "%Y-%m-%dT%H:%M:%S") < as.POSIXct(endDate, fo
     bind_rows(blrTempNew) ->
     blrTemp
 
+  url <- paste0("https://api.oikolab.com/weather?start=", startDate, "&end=",endDate,"&param=wind_speed&freq=H&lat=",bloreLat,"&lon=",bloreLon,"&api-key=",primKey)
+  tmp <- tempfile()
+  download.file(url, tmp)
+  w1 <- jsonlite::fromJSON(tmp)
+  w2 <- jsonlite::fromJSON(w1$data)
+  w2$data %>%
+    as_tibble() %>%
+    set_names(c("Latlong", "Source", "Something", "SomethingElse", "Wind")) %>%
+    mutate(
+      Index = w2$index,
+      DT=as.POSIXct(Index, origin='1970-01-01')
+    ) ->
+    blrWindNew
+
+  url <- paste0("https://api.oikolab.com/weather?start=", startDate, "&end=",endDate,"&param=wind_direction&freq=H&lat=",bloreLat,"&lon=",bloreLon,"&api-key=",primKey)
+  tmp <- tempfile()
+  download.file(url, tmp)
+  wd1 <- jsonlite::fromJSON(tmp)
+  wd2 <- jsonlite::fromJSON(wd1$data)
+  wd2$data %>%
+    as_tibble() %>%
+    set_names(c("Latlong", "Source", "Something", "SomethingElse", "WindDir")) %>%
+    mutate(
+      Index = wd2$index,
+      DT=as.POSIXct(Index, origin='1970-01-01')
+    ) %>%
+    select(DT, WindDir) ->
+    blrWindDirNew
+
+  blrWindNew <- blrWindNew %>% left_join(blrWindDirNew, by = "DT")
+
+  blrWind %>%
+    bind_rows(blrWindNew) ->
+    blrWind
+
   save(blrTemp, file=file.path(script_dir, 'data', 'bangaloreTemperature.RData'))
   save(blrRain, file=file.path(script_dir, 'data', 'bangaloreRainfall.RData'))
+  save(blrWind, file=file.path(script_dir, 'data', 'bangaloreWind.RData'))
 } else {
   message("Data already up to date, skipping fetch.")
 }

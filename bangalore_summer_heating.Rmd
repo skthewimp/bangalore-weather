@@ -1,0 +1,621 @@
+---
+title: "Are Bangalore Summers Getting Hotter?"
+subtitle: "What the data actually says vs what Twitter says"
+output: html_notebook
+---
+
+```{r setup, message=FALSE, warning=FALSE}
+require(tidyverse)
+require(lubridate)
+require(ggthemes)
+require(ggrepel)
+require(patchwork)
+
+load('/Users/Karthik/Documents/work/data work/bangalore/weather/data/bangaloreTemperature.RData')
+
+blrTemp %>%
+  filter(!is.na(Temp)) %>%
+  mutate(
+    Temp = as.numeric(Temp),
+    Hour = hour(DT),
+    Year = year(DT),
+    Month = month(DT),
+    Day = day(DT),
+    Date = as.Date(DT)
+  ) %>%
+  filter(Year >= 1981, Year <= 2025) ->
+  blrTemp
+
+# Reusable theme
+theme_blr <- function() {
+  ggthemes::theme_tufte() +
+    theme(
+      panel.grid = element_blank(),
+      panel.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+      plot.background = element_rect(fill = '#e5e1d8', linewidth = 0),
+      axis.text = element_text(face = 'bold', color = '#3C3C3C'),
+      axis.line.y = element_line(colour = 'black', linewidth = 0.2),
+      axis.ticks.x = element_blank(),
+      legend.position = 'none',
+      plot.title = element_text(face = 'bold', color = '#3C3C3C'),
+      plot.subtitle = element_text(size = 9, color = '#5f3946'),
+      plot.caption = element_text(color = '#3C3C3C'),
+      plot.margin = margin(15, 15, 15, 15)
+    )
+}
+
+# Summer = March, April, May
+summer <- blrTemp %>% filter(Month %in% 3:5)
+
+# Daily summaries
+summer_daily <- summer %>%
+  summarise(High = max(Temp), Low = min(Temp), Mean = mean(Temp), .by = c(Date, Year))
+```
+
+
+## The headline number: are summer highs going up?
+
+The most common claim on Twitter: "it used to never cross 35, now it does all the time." Let's check.
+
+```{r summer-highs-trend, fig.width=10, fig.height=5}
+summer_daily %>%
+  summarise(
+    MeanHigh = mean(High),
+    MaxHigh = max(High),
+    .by = Year
+  ) ->
+  yearly_highs
+
+lm_mean <- lm(MeanHigh ~ Year, data = yearly_highs)
+slope_mean <- round(coef(lm_mean)[2] * 10, 2)
+
+# Label outliers
+yearly_highs %>%
+  mutate(
+    Label = case_when(
+      MeanHigh == max(MeanHigh) ~ paste0(Year, ": ", round(MeanHigh, 1), "\u00B0C"),
+      MeanHigh == min(MeanHigh) ~ paste0(Year, ": ", round(MeanHigh, 1), "\u00B0C"),
+      MaxHigh == max(MaxHigh) ~ paste0(Year, " peak: ", round(MaxHigh, 1), "\u00B0C"),
+      TRUE ~ ""
+    )
+  ) ->
+  yearly_highs
+
+yearly_highs %>%
+  ggplot(aes(x = Year, y = MeanHigh)) +
+  geom_point(color = "#5f3946", size = 2) +
+  geom_smooth(method = 'lm', se = FALSE, color = "#CD3333", linewidth = 0.7, linetype = 'dashed') +
+  geom_text_repel(aes(label = Label), size = 3, fontface = 'bold', color = '#3C3C3C',
+                  nudge_y = 0.3, min.segment.length = 0) +
+  annotate("text", x = 1995, y = 34.5,
+           label = paste0("Trend: +", slope_mean, "\u00B0C per decade"),
+           size = 3.5, fontface = 'bold', color = '#CD3333') +
+  scale_y_continuous(breaks = seq(31, 35, 0.5)) +
+  theme_blr() +
+  labs(
+    title = "Average Summer Daily High: Barely Moving",
+    subtitle = "Mean of daily maximum temperature, March-May each year. The trend is modest.",
+    x = "", y = "Mean daily high (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  )
+```
+
+The average summer afternoon is warming at about +0.1 C per decade. That's real but small - you wouldn't feel the difference between 1985 and 2025 on a typical day.
+
+
+## But the extremes are a different story
+
+The number of days crossing 35 C tells a sharper story.
+
+```{r extreme-days, fig.width=10, fig.height=5}
+summer_daily %>%
+  summarise(
+    Above35 = sum(High >= 35),
+    Above36 = sum(High >= 36),
+    .by = Year
+  ) ->
+  extreme_counts
+
+extreme_counts %>%
+  ggplot(aes(x = Year, y = Above35)) +
+  geom_col(fill = "#5f3946", width = 0.7) +
+  geom_text(
+    data = extreme_counts %>% filter(Above35 >= 15),
+    aes(label = Above35), vjust = -0.5, size = 3, fontface = 'bold', color = '#CD3333'
+  ) +
+  geom_smooth(method = 'loess', se = FALSE, color = "#CD3333", linewidth = 0.7, span = 0.5) +
+  annotate("text", x = 2024, y = 38,
+           label = "2024:\n35 days",
+           size = 3, fontface = 'bold', color = '#CD3333', lineheight = 0.9) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  theme_blr() +
+  labs(
+    title = "Days Above 35\u00B0C Per Summer: The Spikes Are Getting Bigger",
+    subtitle = "Number of days where the daily max exceeded 35\u00B0C, March-May. 2024 was unprecedented.",
+    x = "", y = "Days above 35\u00B0C",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  )
+```
+
+
+## The real shift: summer nights
+
+Here's what people might actually be responding to - even if they describe it as "hotter summers." You feel heat not just at 3 PM, but when you can't cool down at night.
+
+```{r summer-nights, fig.width=10, fig.height=5}
+summer_daily %>%
+  summarise(MeanLow = mean(Low), .by = Year) ->
+  yearly_lows
+
+lm_low <- lm(MeanLow ~ Year, data = yearly_lows)
+slope_low <- round(coef(lm_low)[2] * 10, 2)
+
+yearly_lows %>%
+  mutate(
+    Label = case_when(
+      MeanLow == max(MeanLow) ~ paste0(Year, ": ", round(MeanLow, 1), "\u00B0C"),
+      MeanLow == min(MeanLow) ~ paste0(Year, ": ", round(MeanLow, 1), "\u00B0C"),
+      TRUE ~ ""
+    )
+  ) ->
+  yearly_lows
+
+yearly_lows %>%
+  ggplot(aes(x = Year, y = MeanLow)) +
+  geom_point(color = "#2255AA", size = 2) +
+  geom_smooth(method = 'lm', se = FALSE, color = "#CD3333", linewidth = 0.7, linetype = 'dashed') +
+  geom_text_repel(aes(label = Label), size = 3, fontface = 'bold', color = '#3C3C3C',
+                  min.segment.length = 0) +
+  annotate("text", x = 1995, y = 22.5,
+           label = paste0("Trend: +", slope_low, "\u00B0C per decade"),
+           size = 3.5, fontface = 'bold', color = '#CD3333') +
+  theme_blr() +
+  labs(
+    title = "Summer Nights Are Warming 3x Faster Than Afternoons",
+    subtitle = paste0("Mean daily minimum temperature, March-May. Nights warming at +", slope_low, "\u00B0C/decade vs +", slope_mean, "\u00B0C/decade for highs."),
+    x = "", y = "Mean daily low (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  )
+```
+
+
+## Afternoon vs night: the diverging trends
+
+Let's put both on the same chart to make the asymmetry visible.
+
+```{r afternoon-vs-night, fig.width=10, fig.height=5}
+summer %>%
+  mutate(
+    TimeSlot = case_when(
+      Hour %in% 13:16 ~ "Afternoon (1-4 PM)",
+      Hour %in% 2:5 ~ "Night (2-5 AM)",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(TimeSlot)) %>%
+  summarise(MeanTemp = mean(Temp), .by = c(Year, TimeSlot)) ->
+  slot_yearly
+
+# Compute slopes for labels
+slopes <- slot_yearly %>%
+  group_by(TimeSlot) %>%
+  summarise(
+    Slope = round(coef(lm(MeanTemp ~ Year))[2] * 10, 2),
+    LastTemp = MeanTemp[Year == max(Year)],
+    .groups = 'drop'
+  )
+
+slot_yearly %>%
+  ggplot(aes(x = Year, y = MeanTemp, color = TimeSlot)) +
+  geom_point(size = 1.5, alpha = 0.6) +
+  geom_smooth(method = 'lm', se = FALSE, linewidth = 0.8, linetype = 'dashed') +
+  # Direct labels at end
+  geom_text(
+    data = slot_yearly %>% filter(Year == 2025),
+    aes(label = TimeSlot),
+    hjust = -0.05, size = 3, fontface = 'bold', nudge_x = 0.5
+  ) +
+  scale_color_manual(values = c("Afternoon (1-4 PM)" = "#CD3333", "Night (2-5 AM)" = "#2255AA")) +
+  scale_x_continuous(limits = c(1981, 2032)) +
+  annotate("text", x = 1990, y = 31,
+           label = paste0("Afternoon: +", slopes$Slope[slopes$TimeSlot == "Afternoon (1-4 PM)"], "\u00B0C/decade"),
+           color = "#CD3333", fontface = 'bold', size = 3, hjust = 0) +
+  annotate("text", x = 1990, y = 22.5,
+           label = paste0("Night: +", slopes$Slope[slopes$TimeSlot == "Night (2-5 AM)"], "\u00B0C/decade"),
+           color = "#2255AA", fontface = 'bold', size = 3, hjust = 0) +
+  theme_blr() +
+  labs(
+    title = "Two Different Warming Stories at Two Times of Day",
+    subtitle = "Summer afternoon temperatures are nearly flat; summer nights are climbing steadily",
+    x = "", y = "Mean temperature (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  )
+```
+
+
+## Heat streaks: consecutive days above 35 C
+
+One bad day is an anecdote. A streak of bad days is what makes summers feel unbearable.
+
+```{r heat-streaks, fig.width=10, fig.height=5}
+summer_daily %>%
+  arrange(Year, Date) %>%
+  group_by(Year) %>%
+  summarise(
+    MaxStreak = {
+      r <- rle(High >= 35)
+      max(c(r$lengths[r$values], 0))
+    },
+    .groups = 'drop'
+  ) ->
+  streaks
+
+streaks %>%
+  mutate(
+    Label = case_when(
+      MaxStreak >= 10 ~ paste0(MaxStreak, " days"),
+      TRUE ~ ""
+    )
+  ) %>%
+  ggplot(aes(x = Year, y = MaxStreak)) +
+  geom_col(fill = "#5f3946", width = 0.7) +
+  geom_text(aes(label = Label), vjust = -0.3, size = 3, fontface = 'bold', color = '#CD3333') +
+  geom_hline(
+    yintercept = mean(streaks$MaxStreak[streaks$Year <= 2000]),
+    linetype = 'dashed', color = '#9c9280', linewidth = 0.5
+  ) +
+  annotate("text", x = 1987, y = mean(streaks$MaxStreak[streaks$Year <= 2000]) + 0.8,
+           label = paste0("1981-2000 avg: ", round(mean(streaks$MaxStreak[streaks$Year <= 2000]), 1), " days"),
+           size = 2.8, fontface = 'bold', color = '#9c9280') +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  theme_blr() +
+  labs(
+    title = "Longest Heat Streak Each Summer (Consecutive Days Above 35\u00B0C)",
+    subtitle = "2024's 23-day streak was unlike anything in the historical record",
+    x = "", y = "Consecutive days",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  )
+```
+
+
+## The daily cycle in summer: then vs now
+
+How does a "typical summer day" in the 1980s compare to one now, hour by hour?
+
+```{r diurnal-shift, fig.width=10, fig.height=5}
+summer %>%
+  mutate(
+    Era = case_when(
+      Year <= 1995 ~ "1981-1995",
+      Year >= 2011 ~ "2011-2025",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(Era)) %>%
+  summarise(MeanTemp = mean(Temp), .by = c(Hour, Era)) ->
+  diurnal_era
+
+# Compute the gap
+diurnal_era %>%
+  pivot_wider(names_from = Era, values_from = MeanTemp) %>%
+  mutate(Diff = `2011-2025` - `1981-1995`) ->
+  diurnal_diff
+
+max_diff <- diurnal_diff %>% slice_max(Diff, n = 1)
+min_diff <- diurnal_diff %>% slice_min(Diff, n = 1)
+
+p1 <- diurnal_era %>%
+  ggplot(aes(x = Hour, y = MeanTemp, color = Era)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 1.5) +
+  geom_text(
+    data = diurnal_era %>% filter(Hour == 14),
+    aes(label = Era), hjust = -0.1, size = 3, fontface = 'bold', nudge_y = c(0.3, -0.3)
+  ) +
+  scale_x_continuous(breaks = seq(0, 23, 3), labels = paste0(seq(0, 23, 3), ":00")) +
+  scale_color_manual(values = c("1981-1995" = "#9c9280", "2011-2025" = "#CD3333")) +
+  theme_blr() +
+  labs(title = "Average Summer Day: 1981-1995 vs 2011-2025", x = "", y = "\u00B0C")
+
+p2 <- diurnal_diff %>%
+  ggplot(aes(x = Hour, y = Diff)) +
+  geom_col(fill = "#5f3946", width = 0.7) +
+  geom_text(aes(label = paste0("+", round(Diff, 1))), vjust = -0.3, size = 2.5, fontface = 'bold', color = '#3C3C3C') +
+  geom_text(
+    data = max_diff,
+    aes(label = paste0("Peak shift:\n+", round(Diff, 1), "\u00B0C at ", Hour, ":00")),
+    vjust = -1.5, size = 3, fontface = 'bold', color = '#CD3333', lineheight = 0.9
+  ) +
+  scale_x_continuous(breaks = seq(0, 23, 3), labels = paste0(seq(0, 23, 3), ":00")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.2))) +
+  theme_blr() +
+  labs(title = "How Much Warmer at Each Hour?", x = "", y = "Difference (\u00B0C)")
+
+p1 + p2 +
+  plot_layout(ncol = 1, heights = c(60, 40)) +
+  plot_annotation(
+    subtitle = "The gap is largest at night and smallest in the afternoon",
+    caption = "Data: ERA5 via Oikolab"
+  ) &
+  theme(
+    plot.subtitle = element_text(size = 9, color = '#5f3946'),
+    panel.background = element_rect(fill = "#e5e1d8"),
+    plot.background = element_rect(fill = "#e5e1d8", linewidth = 0)
+  )
+```
+
+
+## Month-by-month: which summer month is warming fastest?
+
+```{r monthly-trend, fig.width=10, fig.height=7}
+summer_daily %>%
+  mutate(Month = month(Date)) %>%
+  summarise(
+    MeanHigh = mean(High),
+    MeanLow = mean(Low),
+    .by = c(Year, Month)
+  ) %>%
+  pivot_longer(c(MeanHigh, MeanLow), names_to = "Metric", values_to = "Temp") %>%
+  mutate(
+    MonthName = month.name[Month],
+    MetricLabel = ifelse(Metric == "MeanHigh", "Daily high", "Daily low")
+  ) ->
+  monthly_trends
+
+# Compute slopes
+monthly_trends %>%
+  group_by(MonthName, MetricLabel) %>%
+  summarise(
+    Slope = round(coef(lm(Temp ~ Year))[2] * 10, 2),
+    LastY = max(Year),
+    LastTemp = Temp[Year == max(Year)],
+    .groups = 'drop'
+  ) ->
+  month_slopes
+
+monthly_trends %>%
+  mutate(MonthName = factor(MonthName, levels = c("March", "April", "May"))) %>%
+  ggplot(aes(x = Year, y = Temp, color = MetricLabel)) +
+  geom_point(size = 0.8, alpha = 0.4) +
+  geom_smooth(method = 'lm', se = FALSE, linewidth = 0.8) +
+  facet_wrap(~MonthName, nrow = 1) +
+  scale_color_manual(values = c("Daily high" = "#CD3333", "Daily low" = "#2255AA")) +
+  theme_blr() +
+  theme(
+    legend.position = 'bottom',
+    legend.title = element_blank(),
+    strip.text = element_text(face = 'bold', hjust = 0, size = 11)
+  ) +
+  labs(
+    title = "Summer Warming by Month: Highs vs Lows",
+    subtitle = "In all three months, nightly lows are climbing faster than daytime highs",
+    x = "", y = "Temperature (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  )
+```
+
+```{r monthly-slopes-table}
+month_slopes %>%
+  pivot_wider(names_from = MetricLabel, values_from = c(Slope, LastTemp)) %>%
+  select(MonthName, `Slope_Daily high`, `Slope_Daily low`) %>%
+  rename(Month = MonthName, `High trend (C/decade)` = `Slope_Daily high`, `Low trend (C/decade)` = `Slope_Daily low`) ->
+  slope_table
+
+knitr::kable(slope_table, caption = "Warming rate per decade, by month and metric")
+```
+
+
+## The diurnal range is shrinking
+
+If nights warm faster than days, the gap between daily high and daily low should be narrowing. This is a classic urban heat island signature.
+
+```{r diurnal-range, fig.width=10, fig.height=5}
+summer_daily %>%
+  mutate(Range = High - Low) %>%
+  summarise(MeanRange = mean(Range), .by = Year) ->
+  yearly_range
+
+lm_range <- lm(MeanRange ~ Year, data = yearly_range)
+slope_range <- round(coef(lm_range)[2] * 10, 2)
+
+yearly_range %>%
+  mutate(
+    Label = case_when(
+      MeanRange == max(MeanRange) | MeanRange == min(MeanRange) ~ paste0(Year, ": ", round(MeanRange, 1), "\u00B0C"),
+      TRUE ~ ""
+    )
+  ) %>%
+  ggplot(aes(x = Year, y = MeanRange)) +
+  geom_point(color = "#5f3946", size = 2) +
+  geom_smooth(method = 'lm', se = FALSE, color = "#CD3333", linewidth = 0.7, linetype = 'dashed') +
+  geom_text_repel(aes(label = Label), size = 3, fontface = 'bold', color = '#3C3C3C',
+                  min.segment.length = 0) +
+  annotate("text", x = 2000, y = max(yearly_range$MeanRange) - 0.2,
+           label = paste0("Trend: ", slope_range, "\u00B0C per decade"),
+           size = 3.5, fontface = 'bold', color = '#CD3333') +
+  theme_blr() +
+  labs(
+    title = "Summer Diurnal Range Is Shrinking",
+    subtitle = "The gap between daily high and low is narrowing as nights warm faster. A signature of urbanisation.",
+    x = "", y = "Daily high minus daily low (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  )
+```
+
+
+## 2024: the outlier year
+
+2024 stands out in every metric. Let's see what made it special.
+
+```{r year-2024, fig.width=12, fig.height=6}
+# Daily highs in 2024 vs historical envelope
+summer_daily %>%
+  mutate(DOY = yday(Date)) %>%
+  filter(DOY >= 60, DOY <= 152) ->  # Mar 1 to May 31
+  summer_doy
+
+summer_doy %>%
+  filter(Year < 2024) %>%
+  summarise(
+    P10 = quantile(High, 0.10),
+    P90 = quantile(High, 0.90),
+    Median = median(High),
+    .by = DOY
+  ) ->
+  hist_envelope
+
+summer_doy %>%
+  filter(Year == 2024) %>%
+  select(DOY, High2024 = High) ->
+  y2024
+
+hist_envelope %>%
+  left_join(y2024, by = "DOY") %>%
+  mutate(Date = as.Date(DOY - 1, origin = "2024-01-01")) ->
+  envelope_data
+
+envelope_data %>%
+  ggplot(aes(x = Date)) +
+  geom_ribbon(aes(ymin = P10, ymax = P90), fill = "#9c9280", alpha = 0.3) +
+  geom_line(aes(y = Median), color = "#9c9280", linewidth = 0.6) +
+  geom_line(aes(y = High2024), color = "#CD3333", linewidth = 0.8) +
+  geom_point(
+    data = envelope_data %>% filter(!is.na(High2024) & High2024 > P90),
+    aes(y = High2024), color = "#CD3333", size = 1.5
+  ) +
+  # Inline legend
+  annotate("segment", x = as.Date("2024-03-05"), xend = as.Date("2024-03-15"),
+           y = 38.5, yend = 38.5, color = "#CD3333", linewidth = 1) +
+  annotate("text", x = as.Date("2024-03-16"), y = 38.5,
+           label = "2024", hjust = 0, size = 3, fontface = 'bold', color = "#CD3333") +
+  annotate("segment", x = as.Date("2024-03-05"), xend = as.Date("2024-03-15"),
+           y = 37.5, yend = 37.5, color = "#9c9280", linewidth = 0.8) +
+  annotate("text", x = as.Date("2024-03-16"), y = 37.5,
+           label = "Median (1981-2023)", hjust = 0, size = 3, fontface = 'bold', color = "#9c9280") +
+  annotate("rect", xmin = as.Date("2024-03-04"), xmax = as.Date("2024-03-15"),
+           ymin = 36.3, ymax = 36.9, fill = "#9c9280", alpha = 0.3) +
+  annotate("text", x = as.Date("2024-03-16"), y = 36.6,
+           label = "10th-90th percentile", hjust = 0, size = 3, fontface = 'bold', color = "#9c9280") +
+  scale_x_date(date_labels = "%b %d", breaks = seq(as.Date("2024-03-01"), as.Date("2024-05-31"), by = "2 weeks")) +
+  theme_blr() +
+  labs(
+    title = "2024: Off the Charts",
+    subtitle = "Daily highs in 2024 vs the 1981-2023 historical range. Almost the entire April-May period was above the 90th percentile.",
+    x = "", y = "Daily high (\u00B0C)",
+    caption = "Data: ERA5 via Oikolab"
+  )
+```
+
+
+## How many hours above 30 C per summer day?
+
+Another way to measure heat: not just the peak, but how long it stays hot.
+
+```{r hours-above-30, fig.width=10, fig.height=5}
+summer %>%
+  mutate(Above30 = Temp >= 30) %>%
+  summarise(HoursAbove30 = sum(Above30), .by = c(Date, Year)) %>%
+  summarise(MeanHoursAbove30 = mean(HoursAbove30), .by = Year) ->
+  hours_above
+
+lm_hours <- lm(MeanHoursAbove30 ~ Year, data = hours_above)
+slope_hours <- round(coef(lm_hours)[2] * 10, 1)
+
+hours_above %>%
+  mutate(
+    Label = case_when(
+      MeanHoursAbove30 == max(MeanHoursAbove30) | MeanHoursAbove30 == min(MeanHoursAbove30) ~
+        paste0(Year, ": ", round(MeanHoursAbove30, 1), "h"),
+      TRUE ~ ""
+    )
+  ) %>%
+  ggplot(aes(x = Year, y = MeanHoursAbove30)) +
+  geom_point(color = "#5f3946", size = 2) +
+  geom_smooth(method = 'lm', se = FALSE, color = "#CD3333", linewidth = 0.7, linetype = 'dashed') +
+  geom_text_repel(aes(label = Label), size = 3, fontface = 'bold', color = '#3C3C3C',
+                  min.segment.length = 0) +
+  annotate("text", x = 2000, y = max(hours_above$MeanHoursAbove30) - 0.2,
+           label = paste0("Trend: +", slope_hours, " hours per decade"),
+           size = 3.2, fontface = 'bold', color = '#CD3333') +
+  theme_blr() +
+  labs(
+    title = "Hours Above 30\u00B0C Per Day in Summer",
+    subtitle = "The number of uncomfortable hours is growing. Not just the peak, but the duration.",
+    x = "", y = "Mean hours above 30\u00B0C per day",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  )
+```
+
+
+## The night question: warm nights are the new normal
+
+Below 20 C on a summer night was common in the 1980s. Now it's rare.
+
+```{r cool-nights-disappearing, fig.width=10, fig.height=5}
+summer_daily %>%
+  summarise(
+    NightsBelow20 = sum(Low < 20),
+    NightsAbove22 = sum(Low > 22),
+    TotalDays = n(),
+    .by = Year
+  ) %>%
+  mutate(
+    PctBelow20 = NightsBelow20 / TotalDays * 100,
+    PctAbove22 = NightsAbove22 / TotalDays * 100
+  ) ->
+  night_counts
+
+p_cool <- night_counts %>%
+  ggplot(aes(x = Year, y = PctBelow20)) +
+  geom_col(fill = "#2255AA", width = 0.7) +
+  geom_smooth(method = 'loess', se = FALSE, color = '#3C3C3C', linewidth = 0.5, span = 0.5) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)), labels = function(x) paste0(x, "%")) +
+  theme_blr() +
+  labs(title = "Cool Summer Nights (Low < 20\u00B0C)", x = "", y = "")
+
+p_warm <- night_counts %>%
+  ggplot(aes(x = Year, y = PctAbove22)) +
+  geom_col(fill = "#CD3333", width = 0.7) +
+  geom_smooth(method = 'loess', se = FALSE, color = '#3C3C3C', linewidth = 0.5, span = 0.5) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)), labels = function(x) paste0(x, "%")) +
+  theme_blr() +
+  labs(title = "Warm Summer Nights (Low > 22\u00B0C)", x = "", y = "")
+
+p_cool + p_warm +
+  plot_annotation(
+    subtitle = "Cool nights almost gone; warm nights now dominate. This is the change people feel.",
+    caption = "Data: ERA5 via Oikolab, 1981-2025"
+  ) &
+  theme(
+    plot.subtitle = element_text(size = 9, color = '#5f3946'),
+    panel.background = element_rect(fill = "#e5e1d8"),
+    plot.background = element_rect(fill = "#e5e1d8", linewidth = 0)
+  )
+```
+
+
+## Summary
+
+```{r summary}
+cat("ARE BANGALORE SUMMERS GETTING HOTTER?\n")
+cat("=====================================\n\n")
+cat("The short answer: yes, but not in the way Twitter thinks.\n\n")
+cat("1. AFTERNOON HIGHS: barely moving\n")
+cat(paste0("   +", slope_mean, " C/decade. A typical summer afternoon in 2025 is\n"))
+cat(paste0("   only ~0.5 C warmer than in 1985.\n\n"))
+cat("2. EXTREME DAYS: spiking\n")
+cat("   Days above 35 C are getting more frequent and clustering\n")
+cat("   into longer streaks. 2024 was unprecedented.\n\n")
+cat("3. NIGHTS: this is where the action is\n")
+cat(paste0("   +", slope_low, " C/decade. Summer nights have warmed ~1.5 C since 1981.\n"))
+cat("   Cool nights below 20 C have nearly disappeared.\n\n")
+cat("4. DURATION: not just hotter, longer\n")
+cat(paste0("   +", slope_hours, " hours above 30 C per day, per decade.\n\n"))
+cat("5. DIURNAL RANGE: shrinking\n")
+cat(paste0("   ", slope_range, " C/decade. Nights warming faster than days\n"))
+cat("   is a classic urban heat island signature.\n\n")
+cat("What people feel as 'hotter summers' is likely:\n")
+cat("   - More extreme heat days (spiky, not gradual)\n")
+cat("   - Warmer nights with no relief\n")
+cat("   - Less about 3 PM temperature, more about 3 AM\n")
+```
