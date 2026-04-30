@@ -148,19 +148,96 @@ recent_rain <- rain_daily %>% filter(DT >= cutoff_date)
 hist_temp <- temp_daily %>% filter(DT < as.Date(paste0(curr_year, "-01-01")))
 hist_rain <- rain_daily %>% filter(DT < as.Date(paste0(curr_year, "-01-01")))
 
-# Normal ranges for the same calendar days
-recent_cal <- recent_temp %>% distinct(Month, Day)
-normal_temp <- hist_temp %>%
-  inner_join(recent_cal, by = c("Month", "Day")) %>%
-  summarise(NormalHigh = mean(High), NormalLow = mean(Low))
-normal_rain <- hist_rain %>%
-  inner_join(recent_cal, by = c("Month", "Day")) %>%
-  summarise(NormalRain = sum(Rain) / n_distinct(year(DT)))
+# --- Build per-day actual vs climatological normal table ---
+norms_temp_by_day <- hist_temp %>%
+  summarise(NormalHigh = mean(High), NormalLow = mean(Low), .by = c(Month, Day))
+norms_rain_by_day <- hist_rain %>%
+  summarise(NormalRain = sum(Rain) / n_distinct(year(DT)), .by = c(Month, Day))
 
-hottest <- recent_temp %>% slice_max(High, n = 1, with_ties = FALSE)
-coldest <- recent_temp %>% slice_min(Low, n = 1, with_ties = FALSE)
-total_rain <- sum(recent_rain$Rain)
-rainy_days <- sum(recent_rain$Rain >= 0.1)
+window_daily <- recent_temp %>%
+  left_join(recent_rain %>% select(DT, Rain), by = "DT") %>%
+  mutate(Rain = coalesce(Rain, 0)) %>%
+  left_join(norms_temp_by_day, by = c("Month", "Day")) %>%
+  left_join(norms_rain_by_day, by = c("Month", "Day")) %>%
+  arrange(DT) %>%
+  mutate(
+    HighDev = High - NormalHigh,
+    LowDev = Low - NormalLow,
+    RainDev = Rain - NormalRain
+  )
+
+total_rain <- sum(window_daily$Rain)
+rainy_days <- sum(window_daily$Rain >= 0.1)
+normal_total_rain <- sum(window_daily$NormalRain)
+normal_rainy_days <- mean(window_daily$NormalRain >= 0.1) * recent_window
+
+# Per-day printout: actual + climatological normal + deviation for high/low/rain
+daily_table <- window_daily %>%
+  mutate(line = paste0(
+    format(DT, "%b %d"),
+    "  high ", sprintf("%.1f", High), "°C (norm ", sprintf("%.1f", NormalHigh),
+    ", ", ifelse(HighDev >= 0, "+", ""), sprintf("%.1f", HighDev), ")",
+    "  low ", sprintf("%.1f", Low), "°C (norm ", sprintf("%.1f", NormalLow),
+    ", ", ifelse(LowDev >= 0, "+", ""), sprintf("%.1f", LowDev), ")",
+    "  rain ", sprintf("%.1f", Rain), "mm (norm ", sprintf("%.1f", NormalRain), ")"
+  )) %>%
+  pull(line) %>%
+  paste(collapse = "\n")
+
+# Wettest k-day stretches inside the window
+roll_max_rain <- function(k) {
+  n <- nrow(window_daily)
+  if (n < k) return(NULL)
+  sums <- map_dbl(seq_len(n - k + 1), ~ sum(window_daily$Rain[.x:(.x + k - 1)]))
+  i <- which.max(sums)
+  if (sums[i] < 0.1) return(NULL)
+  paste0("Wettest ", k, "-day stretch: ", sprintf("%.1f", sums[i]), "mm (",
+         format(window_daily$DT[i], "%b %d"), " - ",
+         format(window_daily$DT[i + k - 1], "%b %d"), ")")
+}
+rolling_text <- c(roll_max_rain(2), roll_max_rain(3), roll_max_rain(5)) %>%
+  discard(is.null) %>% paste(collapse = "\n")
+
+# Generic longest-run helper over a logical vector aligned with window_daily$DT
+longest_run <- function(flags) {
+  flags <- replace(flags, is.na(flags), FALSE)
+  if (!any(flags)) return(NULL)
+  r <- rle(flags)
+  is_t <- which(r$values)
+  best <- is_t[which.max(r$lengths[is_t])]
+  end_pos <- sum(r$lengths[seq_len(best)])
+  start_pos <- end_pos - r$lengths[best] + 1
+  list(len = r$lengths[best], start = window_daily$DT[start_pos], end = window_daily$DT[end_pos])
+}
+fmt_run <- function(label, run) {
+  if (is.null(run) || run$len < 2) return(NULL)
+  paste0(label, ": ", run$len, " days (", format(run$start, "%b %d"), " - ",
+         format(run$end, "%b %d"), ")")
+}
+streaks_text <- c(
+  fmt_run("Dry streak in window (rain <0.1mm)",            longest_run(window_daily$Rain < 0.1)),
+  fmt_run("Wet streak in window (rain >=0.1mm)",           longest_run(window_daily$Rain >= 0.1)),
+  fmt_run("Hot-day streak (high >=2°C above normal)",  longest_run(window_daily$HighDev >= 2)),
+  fmt_run("Cool-day streak (high >=2°C below normal)", longest_run(window_daily$HighDev <= -2)),
+  fmt_run("Warm-night streak (low >=2°C above normal)",longest_run(window_daily$LowDev >= 2)),
+  fmt_run("Cool-night streak (low >=2°C below normal)",longest_run(window_daily$LowDev <= -2))
+) %>% discard(is.null) %>% paste(collapse = "\n")
+
+# Antecedent streaks: dry/wet run extending before the window's first opposite day
+ante_streak <- function(opposite_in_window, threshold_fn, label) {
+  hits <- which(opposite_in_window)
+  end_date <- if (length(hits)) window_daily$DT[hits[1]] - 1 else Sys.Date()
+  run_n <- rain_daily %>%
+    filter(DT <= end_date) %>% arrange(desc(DT)) %>%
+    mutate(stop = !threshold_fn(Rain), cum = cumsum(stop)) %>%
+    filter(cum == 0) %>% nrow()
+  if (run_n < 3) return(NULL)
+  paste0(label, ": ", run_n, " days ending ", format(end_date, "%b %d"))
+}
+antecedent_text <- c(
+  ante_streak(window_daily$Rain >= 0.1, function(r) r < 0.1,  "Dry streak preceding first rain in window"),
+  ante_streak(window_daily$Rain < 0.1,  function(r) r >= 0.1, "Wet streak preceding first dry day in window")
+) %>% discard(is.null) %>% paste(collapse = "\n")
 
 # Record-breaking days in the window
 hist_records <- hist_temp %>%
@@ -180,13 +257,16 @@ record_text <- if (nrow(record_detail) > 0) {
 
 recent_facts <- paste0(
   "Period: ", format(cutoff_date, "%b %d"), " - ", format(Sys.Date(), "%b %d, %Y"), "\n",
-  "Avg daily high: ", round(mean(recent_temp$High), 1), "\u00B0C (normal for these dates: ", round(normal_temp$NormalHigh, 1), "\u00B0C)\n",
-  "Avg daily low: ", round(mean(recent_temp$Low), 1), "\u00B0C (normal: ", round(normal_temp$NormalLow, 1), "\u00B0C)\n",
-  "Hottest day: ", round(hottest$High, 1), "\u00B0C on ", format(hottest$DT, "%b %d"), "\n",
-  "Coldest night: ", round(coldest$Low, 1), "\u00B0C on ", format(coldest$DT, "%b %d"), "\n",
-  "Total rainfall: ", round(total_rain, 0), "mm (normal for these dates: ~", round(normal_rain$NormalRain, 0), "mm)\n",
-  "Rainy days: ", rainy_days, "\n",
-  record_text
+  "\nWINDOW SUMMARY\n",
+  "Avg daily high: ", sprintf("%.1f", mean(window_daily$High)), "\u00B0C (normal ", sprintf("%.1f", mean(window_daily$NormalHigh)), "\u00B0C)\n",
+  "Avg daily low: ",  sprintf("%.1f", mean(window_daily$Low)),  "\u00B0C (normal ", sprintf("%.1f", mean(window_daily$NormalLow)),  "\u00B0C)\n",
+  "Total rainfall: ", sprintf("%.1f", total_rain), "mm (normal ~", sprintf("%.1f", normal_total_rain), "mm)\n",
+  "Rainy days: ", rainy_days, " of ", recent_window, " (normal ~", sprintf("%.1f", normal_rainy_days), ")\n",
+  "\nDAILY DETAIL (actual vs climatological normal)\n", daily_table, "\n",
+  if (nzchar(rolling_text))    paste0("\nWETTEST MULTI-DAY STRETCHES\n", rolling_text, "\n") else "",
+  if (nzchar(streaks_text))    paste0("\nSTREAKS WITHIN WINDOW\n", streaks_text, "\n") else "",
+  if (nzchar(antecedent_text)) paste0("\nANTECEDENT STREAKS (extending before window)\n", antecedent_text, "\n") else "",
+  if (nzchar(record_text))     paste0("\n", record_text) else ""
 )
 
 commentary <- tryCatch({
@@ -194,11 +274,11 @@ commentary <- tryCatch({
     model = "claude-haiku-4-5-20251001",
     max_tokens = 200,
     system = paste0(
-      "You are writing a terse chart subtitle for a Bangalore weather visualization. ",
-      "You receive weather stats for ", format(cutoff_date, "%b %d"), " - ", format(Sys.Date(), "%b %d, %Y"), " compared to 40-year historical norms. ",
+      "You write a terse chart subtitle for a Bangalore weather visualization. ",
+      "You receive: a window summary, a per-day actual-vs-normal table, the wettest 2/3/5-day stretches, every notable streak inside the window (dry, wet, hot, cool, warm-night, cool-night), antecedent dry/wet streaks extending before the window, and any records broken since 1981. The numbers are pre-computed; your job is to pick the most striking signals and phrase them. ",
       "Write exactly 3 bullets that a Bangalore resident would find interesting. ",
-      "Focus on what is unusual or noteworthy - not just restating numbers. ",
-      "Compare to what is normal for this time of year. Mention if it has been warmer/cooler/drier/wetter than usual and by how much. ",
+      "Choose the 2-3 most noteworthy signals from the data. The interesting story might be a multi-day rain stretch, a long dry spell broken by sudden rain, a heat or cool streak, a record day, an unusually warm night pattern, a sustained departure from normal, or something else entirely. Pick whatever is most striking; do not default to any one frame. ",
+      "Use the per-day deviations to judge what is unusual. If a signal exists in the data (e.g. a 30-day antecedent dry streak, or 5 consecutive nights >=2\u00B0C above normal), you must surface it - do not blur it into a window average. Do not call a window 'trace rainfall' if a single day or short stretch carried most of it; describe what actually happened. ",
       "Each bullet must be under 15 words, start with '\u2022 ', and use \u00B0C. ",
       "Never say 'this period' or 'the period'. Use specific dates like '", format(cutoff_date, "%b %d"), " - ", format(Sys.Date(), "%b %d"), "' or 'late March' etc. ",
       "Plain, calm tone. No hyperbole. Output only the 3 bullets, nothing else."
