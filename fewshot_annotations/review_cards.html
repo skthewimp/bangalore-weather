@@ -1,0 +1,214 @@
+<!doctype html>
+<html>
+<head>
+<meta charset='utf-8'>
+<title>Bangalore weather few-shot review</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 32px auto; max-width: 1100px; color: #222; background: #f7f4ed; }
+h1, h2, h3 { color: #3c3c3c; }
+.card { background: white; padding: 20px; margin: 0 0 28px 0; border: 1px solid #ddd6c8; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+.meta { color: #6b4651; margin-bottom: 12px; }
+img { width: 100%; height: auto; border: 1px solid #e3dccd; }
+ul { margin-top: 10px; }
+li { margin: 6px 0; }
+.prompt { font-weight: 600; margin-top: 12px; }
+.small { color: #666; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>Bangalore weather few-shot review</h1>
+<p class='small'>See the charts here. Enter your responses in <code>fewshot_annotations/data/feedback_sheet.csv</code> using the matching <code>example_id</code>.</p>
+<div class='card'>
+<h2>Example 01 — Dry spell broken by a sharp burst</h2>
+<div class='meta'>Apr 12, 2021 to Apr 25, 2021 | 14-day window</div>
+<img src='charts/rain-burst-after-dry_20210412_14d.png' alt='Example 01'>
+<ul>
+<li><strong>Why this case matters:</strong> Totals alone are misleading; the key is the sudden break after dryness.</li>
+<li><strong>Why this window length:</strong> The story is the break, not the total.</li>
+<li><strong>Facts to read:</strong> Rain 81.1mm vs 24.8mm normal; avg high dev -1.8°C; avg low dev +0.1°C; rainy days 10; wettest 3-day stretch 51.7mm; antecedent dry streak 51 days; record days 0</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 02 — Sustained wet stretch</h2>
+<div class='meta'>Oct 01, 2005 to Oct 30, 2005 | 30-day window</div>
+<img src='charts/sustained-wet_20051001_30d.png' alt='Example 02'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model to recognise persistence rather than a single heavy day.</li>
+<li><strong>Why this window length:</strong> A longer window is needed so the persistence is visible.</li>
+<li><strong>Facts to read:</strong> Rain 361.0mm vs 132.6mm normal; avg high dev -0.9°C; avg low dev +0.4°C; rainy days 30; wettest 3-day stretch 69.7mm; antecedent dry streak 0 days; record days 0</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 03 — Rain concentrated into one short spell</h2>
+<div class='meta'>May 14, 2013 to May 20, 2013 | 7-day window</div>
+<img src='charts/concentrated-rain_20130514_7d.png' alt='Example 03'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model not to call a window broadly wet when the rain is concentrated.</li>
+<li><strong>Why this window length:</strong> Shorter framing prevents one burst from being misread as a wet fortnight.</li>
+<li><strong>Facts to read:</strong> Rain 110.7mm vs 24.5mm normal; avg high dev +0.8°C; avg low dev +0.6°C; rainy days 3; wettest 3-day stretch 110.6mm; antecedent dry streak 5 days; record days 0</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 04 — Persistently dry window</h2>
+<div class='meta'>Oct 12, 2015 to Oct 25, 2015 | 14-day window</div>
+<img src='charts/persistent-dry_20151012_14d.png' alt='Example 04'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model to treat absence of rain as a real signal.</li>
+<li><strong>Why this window length:</strong> A wider window is useful because absence is cumulative.</li>
+<li><strong>Facts to read:</strong> Rain 1.1mm vs 57.7mm normal; avg high dev +2.7°C; avg low dev +0.3°C; rainy days 1; wettest 3-day stretch 1.0mm; antecedent dry streak 0 days; record days 9</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 05 — Daytime heat spell</h2>
+<div class='meta'>Apr 24, 2024 to May 07, 2024 | 14-day window</div>
+<img src='charts/hot-spell_20240424_14d.png' alt='Example 05'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model to prioritise a clear daytime heat run.</li>
+<li><strong>Why this window length:</strong> The run-length matters more than any single hottest day.</li>
+<li><strong>Facts to read:</strong> Rain 3.4mm vs 34.8mm normal; avg high dev +4.4°C; avg low dev +3.6°C; rainy days 5; wettest 3-day stretch 2.5mm; antecedent dry streak 12 days; record days 11</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 06 — Warm-night run</h2>
+<div class='meta'>Dec 07, 2014 to Dec 20, 2014 | 14-day window</div>
+<img src='charts/warm-nights_20141207_14d.png' alt='Example 06'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model not to miss elevated night temperatures when highs are less dramatic.</li>
+<li><strong>Why this window length:</strong> This needs enough days for the night pattern to be unmistakable.</li>
+<li><strong>Facts to read:</strong> Rain 13.6mm vs 9.9mm normal; avg high dev +1.5°C; avg low dev +3.7°C; rainy days 11; wettest 3-day stretch 7.8mm; antecedent dry streak 8 days; record days 3</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 07 — Cool daytime spell</h2>
+<div class='meta'>Mar 20, 2008 to Apr 02, 2008 | 14-day window</div>
+<img src='charts/cool-spell_20080320_14d.png' alt='Example 07'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model to spot sustained cool highs relative to normal.</li>
+<li><strong>Why this window length:</strong> This is about persistent daytime coolness, not a one-day dip.</li>
+<li><strong>Facts to read:</strong> Rain 129.5mm vs 8.6mm normal; avg high dev -4.5°C; avg low dev -0.6°C; rainy days 14; wettest 3-day stretch 43.5mm; antecedent dry streak 3 days; record days 0</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 08 — Cool-night run</h2>
+<div class='meta'>Oct 26, 2008 to Nov 08, 2008 | 14-day window</div>
+<img src='charts/cool-nights_20081026_14d.png' alt='Example 08'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model to separate cool nights from cool days.</li>
+<li><strong>Why this window length:</strong> The window is chosen to preserve the night-time pattern.</li>
+<li><strong>Facts to read:</strong> Rain 1.8mm vs 54.7mm normal; avg high dev +0.9°C; avg low dev -3.6°C; rainy days 1; wettest 3-day stretch 1.8mm; antecedent dry streak 0 days; record days 9</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 09 — Record-heavy patch</h2>
+<div class='meta'>Nov 15, 2016 to Nov 28, 2016 | 14-day window</div>
+<img src='charts/record-cluster_20161115_14d.png' alt='Example 09'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model to foreground records when they cluster.</li>
+<li><strong>Why this window length:</strong> The record cluster is the editorial hook.</li>
+<li><strong>Facts to read:</strong> Rain 0.6mm vs 25.8mm normal; avg high dev +3.8°C; avg low dev -0.1°C; rainy days 2; wettest 3-day stretch 0.6mm; antecedent dry streak 2 days; record days 14</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 10 — Wet month building through accumulation</h2>
+<div class='meta'>Nov 03, 2015 to Dec 02, 2015 | 30-day window</div>
+<img src='charts/wet-month-build_20151103_30d.png' alt='Example 10'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model that some stories are cumulative and need a month-long frame.</li>
+<li><strong>Why this window length:</strong> A 30-day view is needed because the anomaly accumulates.</li>
+<li><strong>Facts to read:</strong> Rain 371.5mm vs 56.6mm normal; avg high dev -0.8°C; avg low dev +2.1°C; rainy days 25; wettest 3-day stretch 169.8mm; antecedent dry streak 0 days; record days 1</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 11 — Dry month building through accumulation</h2>
+<div class='meta'>Sep 29, 2016 to Oct 28, 2016 | 30-day window</div>
+<img src='charts/dry-month-build_20160929_30d.png' alt='Example 11'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model that rainfall deficits often need a month-long frame.</li>
+<li><strong>Why this window length:</strong> A 30-day view is needed because the deficit builds gradually.</li>
+<li><strong>Facts to read:</strong> Rain 27.2mm vs 138.0mm normal; avg high dev +1.9°C; avg low dev +0.0°C; rainy days 9; wettest 3-day stretch 22.5mm; antecedent dry streak 0 days; record days 6</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+<div class='card'>
+<h2>Example 12 — Heat-to-rain whiplash</h2>
+<div class='meta'>Feb 28, 2009 to Mar 13, 2009 | 14-day window</div>
+<img src='charts/mixed-whiplash_20090228_14d.png' alt='Example 12'>
+<ul>
+<li><strong>Why this case matters:</strong> This teaches the model to keep two linked signals in view instead of flattening them.</li>
+<li><strong>Why this window length:</strong> The chosen span keeps both parts of the story visible.</li>
+<li><strong>Facts to read:</strong> Rain 11.0mm vs 7.3mm normal; avg high dev +0.8°C; avg low dev +0.3°C; rainy days 4; wettest 3-day stretch 10.9mm; antecedent dry streak 60 days; record days 5</li>
+</ul>
+<div class='prompt'>Fill these in inside <code>feedback_sheet.csv</code>:</div>
+<ul>
+<li><strong>your_headline</strong></li>
+<li><strong>what_claude_should_learn</strong></li>
+<li><strong>extra_notes</strong> (optional)</li>
+</ul>
+</div>
+</body>
+</html>

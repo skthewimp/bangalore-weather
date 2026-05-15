@@ -1,0 +1,13 @@
+example_id,start_date,end_date,preferred_lead,lesson
+Example 01,2021-04-12,2021-04-25,"Heavy rain on Apr 24-25 brought a sharp temperature drop","Lead with the rain burst and its cooling effect, not a generic dry-spell frame."
+Example 02,2005-10-01,2005-10-30,"Heavy rain through October with no dry days and a late cool-down","When rain falls every day, say that persistence directly."
+Example 03,2013-05-14,2013-05-20,"Extreme rain on May 20 broke a hot dry start to the week","If one day dominates the week, lead with that day."
+Example 04,2015-10-12,2015-10-25,"Dry spell from Oct 13-25 with just 1mm versus 58mm expected","For dry windows, pair duration with the rainfall shortfall."
+Example 05,2024-04-24,2024-05-07,"Two-week heat wave with highs and lows more than 3°C above normal","When heat dominates, keep the framing on heat."
+Example 06,2014-12-07,2014-12-20,"Winter warm spell kept minimum temperatures about 4°C above normal despite rain","If rain fails to cool Bangalore, that contrast is worth stating."
+Example 07,2008-03-20,2008-04-02,"Unseasonal heavy rain made for a cool March with highs 5°C below normal","Temperature impact can matter more than the rainfall total itself."
+Example 08,2008-10-26,2008-11-08,"Cold nights after Oct 27 left lows about 3.5°C below expected","When cold and dryness coexist, lead with the more interesting one."
+Example 09,2016-11-15,2016-11-28,"Record-high temperatures dominated this hot dry November stretch","If record days cover most of the window, records come first."
+Example 10,2015-11-03,2015-12-02,"Wet November was driven mainly by the Nov 15-16 deluge","Do not call it sustained accumulation when 1-2 days explain most of the anomaly."
+Example 11,2016-09-29,2016-10-28,"Only 27mm rain in the last month versus the usual 136mm made for a dry October","Monthly totals are the right lead when the signal is genuinely cumulative."
+Example 12,2009-02-28,2009-03-13,"Rain after Mar 10 brought a sharp cool-down after a record-hot start","In whiplash windows, tie the event date to the temperature break."
