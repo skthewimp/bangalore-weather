@@ -35,6 +35,13 @@ Both scripts resolve their own directory at runtime (`sys.frame(1)$ofile` when `
 ### 2021
 ![2021](charts/bangalore_weather_2021.png)
 
+## GitHub Pages
+
+Static HTML artifacts intended for browser viewing can be published from the `docs/` folder with GitHub Pages.
+
+- Landing page: `docs/index.html`
+- Few-shot review cards: `docs/fewshot_annotations/review_cards.html`
+
 ## Requirements
 
 - R with packages: `tidytable`, `tidyverse`, `patchwork`, `lubridate`, `ggthemes`, `ggrepel`, `httr2`, `jsonlite`
