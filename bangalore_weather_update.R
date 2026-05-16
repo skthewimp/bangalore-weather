@@ -30,102 +30,187 @@ load(file.path(script_dir, 'data', 'bangaloreTemperature.RData'))
 load(file.path(script_dir, 'data', 'bangaloreWind.RData'))
 
 blrTemp %>%
+  mutate(Temp = as.numeric(Temp)) %>%
   filter(!is.na(Temp)) ->
   blrTemp
 
 blrRain %>%
+  mutate(Rain = as.numeric(Rain)) %>%
   filter(!is.na(Rain)) -> 
   blrRain
 
 blrWind %>%
+  mutate(
+    Wind = as.numeric(Wind),
+    WindDir = as.numeric(WindDir)
+  ) %>%
   filter(!is.na(Wind)) ->
   blrWind
 
-startDate <-  str_sub(max(blrTemp$DT), 1, 19) %>% str_replace_all(" ", "T")
-endDate <- paste0(Sys.Date(), 'T00:00:00')
-
 bloreLat <- 12.9716
 bloreLon <- 77.5946
+tz_local <- Sys.timezone()
+backfill_days <- 10
+reanalysis_lag_days <- 7
 
-if (as.POSIXct(startDate, format = "%Y-%m-%dT%H:%M:%S") < as.POSIXct(endDate, format = "%Y-%m-%dT%H:%M:%S")) {
-  url <- paste0("https://api.oikolab.com/weather?start=", startDate, "&end=",endDate,"&param=temperature&freq=H&lat=",bloreLat,"&lon=",bloreLon,"&api-key=",primKey)
-
-  tmp <- tempfile()
-  download.file(url, tmp)
-
-  b1 <- jsonlite::fromJSON(tmp)
-  b2 <- jsonlite::fromJSON(b1$data)
-  b2$data %>%
-    as_tibble() %>%
-    set_names(c("Latlong", "Source", "Something", "SomethingElse", "Temp")) %>%
-    mutate(
-      Index = b2$index,
-      DT= as.POSIXct(Index, origin='1970-01-01')
-    ) ->
-    blrTempNew
-
-  url <- paste0("https://api.oikolab.com/weather?start=", startDate, "&end=",endDate,"&param=total_precipitation&freq=H&lat=",bloreLat,"&lon=",bloreLon,"&api-key=",primKey)
-  tmp <- tempfile()
-  download.file(url, tmp)
-  r1 <- jsonlite::fromJSON(tmp)
-  r2 <- jsonlite::fromJSON(r1$data)
-  r2$data %>%
-    as_tibble() %>%
-    set_names(c("Latlong", "Source", "Something", "SomethingElse", "Rain")) %>%
-    mutate(
-      Index = r2$index,
-      DT=as.POSIXct(Index, origin='1970-01-01')
-    ) ->
-    blrRainNew
-
-  blrRain %>%
-    bind_rows(blrRainNew) ->
-    blrRain
-  blrTemp %>%
-    bind_rows(blrTempNew) ->
-    blrTemp
-
-  url <- paste0("https://api.oikolab.com/weather?start=", startDate, "&end=",endDate,"&param=wind_speed&freq=H&lat=",bloreLat,"&lon=",bloreLon,"&api-key=",primKey)
-  tmp <- tempfile()
-  download.file(url, tmp)
-  w1 <- jsonlite::fromJSON(tmp)
-  w2 <- jsonlite::fromJSON(w1$data)
-  w2$data %>%
-    as_tibble() %>%
-    set_names(c("Latlong", "Source", "Something", "SomethingElse", "Wind")) %>%
-    mutate(
-      Index = w2$index,
-      DT=as.POSIXct(Index, origin='1970-01-01')
-    ) ->
-    blrWindNew
-
-  url <- paste0("https://api.oikolab.com/weather?start=", startDate, "&end=",endDate,"&param=wind_direction&freq=H&lat=",bloreLat,"&lon=",bloreLon,"&api-key=",primKey)
-  tmp <- tempfile()
-  download.file(url, tmp)
-  wd1 <- jsonlite::fromJSON(tmp)
-  wd2 <- jsonlite::fromJSON(wd1$data)
-  wd2$data %>%
-    as_tibble() %>%
-    set_names(c("Latlong", "Source", "Something", "SomethingElse", "WindDir")) %>%
-    mutate(
-      Index = wd2$index,
-      DT=as.POSIXct(Index, origin='1970-01-01')
-    ) %>%
-    select(DT, WindDir) ->
-    blrWindDirNew
-
-  blrWindNew <- blrWindNew %>% left_join(blrWindDirNew, by = "DT")
-
-  blrWind %>%
-    bind_rows(blrWindNew) ->
-    blrWind
-
-  save(blrTemp, file=file.path(script_dir, 'data', 'bangaloreTemperature.RData'))
-  save(blrRain, file=file.path(script_dir, 'data', 'bangaloreRainfall.RData'))
-  save(blrWind, file=file.path(script_dir, 'data', 'bangaloreWind.RData'))
-} else {
-  message("Data already up to date, skipping fetch.")
+fmt_oiko_time <- function(x) {
+  format(as.POSIXct(x, tz = tz_local), "%Y-%m-%dT%H:%M:%S")
 }
+
+month_starts_between <- function(start_dt, end_dt) {
+  seq(floor_date(as.Date(start_dt), "month"),
+      floor_date(as.Date(end_dt - hours(1)), "month"),
+      by = "1 month")
+}
+
+oiko_units_needed <- function(start_dt, end_dt, n_params) {
+  length(month_starts_between(start_dt, end_dt)) * n_params
+}
+
+fetch_oiko_payload <- function(start_dt, end_dt, param, model = NULL) {
+  req <- request("https://api.oikolab.com/weather") %>%
+    req_headers(`api-key` = primKey) %>%
+    req_url_query(
+      start = fmt_oiko_time(start_dt),
+      end = fmt_oiko_time(end_dt),
+      param = param,
+      freq = "H",
+      lat = bloreLat,
+      lon = bloreLon
+    )
+
+  if (!is.null(model)) {
+    req <- req %>% req_url_query(model = model)
+  }
+
+  resp <- req %>% req_perform() %>% resp_body_json(simplifyVector = TRUE)
+  jsonlite::fromJSON(resp$data)
+}
+
+fetch_oiko_series <- function(start_dt, end_dt, param, value_name, model = NULL) {
+  payload <- fetch_oiko_payload(start_dt, end_dt, param, model = model)
+
+  payload$data %>%
+    as.data.frame() %>%
+    as_tibble() %>%
+    set_names(c("Latlong", "Source", "Something", "SomethingElse", value_name)) %>%
+    mutate(
+      Index = payload$index,
+      DT = as.POSIXct(Index, origin = "1970-01-01", tz = tz_local),
+      !!value_name := as.numeric(.data[[value_name]])
+    )
+}
+
+replace_window <- function(existing, replacement, start_dt, end_dt) {
+  existing %>%
+    filter(DT < start_dt | DT >= end_dt) %>%
+    bind_rows(replacement)
+}
+
+dedupe_on_dt <- function(df) {
+  df %>%
+    mutate(.source_rank = case_when(
+      Source == "era5" ~ 2L,
+      Source == "gfs" ~ 1L,
+      TRUE ~ 0L
+    )) %>%
+    arrange(DT, desc(.source_rank), desc(Index)) %>%
+    distinct(DT, .keep_all = TRUE) %>%
+    select(-.source_rank)
+}
+
+fetch_oiko_account <- function() {
+  tryCatch(
+    request("https://api.oikolab.com/account") %>%
+      req_headers(`api-key` = primKey) %>%
+      req_perform() %>%
+      resp_body_json(simplifyVector = TRUE),
+    error = function(e) NULL
+  )
+}
+
+repair_month_starts <- function(df, cutoff_date) {
+  df %>%
+    mutate(Date = as.Date(DT)) %>%
+    filter(Source == "gfs", Date <= cutoff_date) %>%
+    transmute(MonthStart = floor_date(Date, "month")) %>%
+    distinct() %>%
+    pull(MonthStart) %>%
+    sort()
+}
+
+repair_month_windows <- function(month_starts) {
+  tibble(
+    start_dt = as.POSIXct(month_starts, tz = tz_local),
+    end_dt = as.POSIXct(month_starts %m+% months(1), tz = tz_local)
+  )
+}
+
+reanalysis_ready_date <- Sys.Date() - reanalysis_lag_days
+fetch_end <- as.POSIXct(paste0(Sys.Date(), " 00:00:00"), tz = tz_local)
+backfill_start <- as.POSIXct(paste0(Sys.Date() - backfill_days, " 00:00:00"), tz = tz_local)
+backfill_start <- max(backfill_start, as.POSIXct(min(blrTemp$DT), tz = tz_local))
+
+repair_months <- union(
+  repair_month_starts(blrTemp, reanalysis_ready_date),
+  repair_month_starts(blrRain, reanalysis_ready_date)
+)
+repair_windows <- repair_month_windows(repair_months)
+
+backfill_units <- oiko_units_needed(backfill_start, fetch_end, n_params = 4)
+repair_units <- if (nrow(repair_windows) > 0) nrow(repair_windows) * 2 else 0
+estimated_units <- backfill_units + repair_units
+
+acct <- fetch_oiko_account()
+remaining_units <- if (is.null(acct)) Inf else acct$incl_units_per_billing_period - acct$current_usage
+do_historical_repair <- repair_units > 0 && estimated_units <= remaining_units
+
+message(
+  "Oikolab refresh plan: backfill ", backfill_days, " days (", backfill_units,
+  " units) + historical repair ", repair_units, " units; remaining allowance ",
+  ifelse(is.finite(remaining_units), remaining_units, "unknown"), "."
+)
+
+if (repair_units > 0 && !do_historical_repair) {
+  message("Skipping historical gfs->era5 repair to stay within remaining Oikolab allowance.")
+}
+
+blrTempBackfill <- fetch_oiko_series(backfill_start, fetch_end, "temperature", "Temp")
+blrRainBackfill <- fetch_oiko_series(backfill_start, fetch_end, "total_precipitation", "Rain")
+blrWindBackfill <- fetch_oiko_series(backfill_start, fetch_end, "wind_speed", "Wind")
+blrWindDirBackfill <- fetch_oiko_series(backfill_start, fetch_end, "wind_direction", "WindDir") %>%
+  select(DT, WindDir)
+blrWindBackfill <- blrWindBackfill %>% left_join(blrWindDirBackfill, by = "DT")
+
+blrTemp <- replace_window(blrTemp, blrTempBackfill, backfill_start, fetch_end)
+blrRain <- replace_window(blrRain, blrRainBackfill, backfill_start, fetch_end)
+blrWind <- replace_window(blrWind, blrWindBackfill, backfill_start, fetch_end)
+
+if (do_historical_repair) {
+  for (i in seq_len(nrow(repair_windows))) {
+    win_start <- repair_windows$start_dt[i]
+    win_end <- repair_windows$end_dt[i]
+    message(
+      "Refreshing historical ERA5 month ",
+      format(win_start, "%Y-%m"),
+      " (", i, "/", nrow(repair_windows), ")."
+    )
+
+    blrTempMonth <- fetch_oiko_series(win_start, win_end, "temperature", "Temp", model = "era5")
+    blrRainMonth <- fetch_oiko_series(win_start, win_end, "total_precipitation", "Rain", model = "era5")
+
+    blrTemp <- replace_window(blrTemp, blrTempMonth, win_start, win_end)
+    blrRain <- replace_window(blrRain, blrRainMonth, win_start, win_end)
+  }
+}
+
+blrTemp <- dedupe_on_dt(blrTemp)
+blrRain <- dedupe_on_dt(blrRain)
+blrWind <- dedupe_on_dt(blrWind)
+
+save(blrTemp, file=file.path(script_dir, 'data', 'bangaloreTemperature.RData'))
+save(blrRain, file=file.path(script_dir, 'data', 'bangaloreRainfall.RData'))
+save(blrWind, file=file.path(script_dir, 'data', 'bangaloreWind.RData'))
 
 curr_year <- max(year(blrTemp$DT))
 

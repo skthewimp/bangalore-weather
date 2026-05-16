@@ -439,3 +439,18 @@ Same fix line 226, 24…
 - bangalore_weather_update.R | 2 +
 
 <!-- claude-session:a1011751-6db5-4d77-b583-f5ea809c53dc:end -->
+
+<!-- codex-session:2026-05-16-oikolab-era5-repair:start -->
+## 2026-05-16 08:22 IST | Codex session `oikolab-era5-repair`
+
+### User prompts
+> now a note on teh data - i don't know if i've got the latlong not right. basically my data not tallying wiht IMD. just look at this year's IMD rain and temperature numbers, and the oikolab numbers for a small range of latlongs around where i have, and recommmend if i should adjust my data sources. 30apr i think IMD said 11cm of rain, but my dataset says 0
+> yes can you do that? also fix historical numbers as well (since they might have come to era5 now from gfs), but stay within the monthly API limit.
+
+### Work done
+- Checked live IMD station pages and fresh Oikolab pulls around Bengaluru; small lat/lon shifts changed April 30 rainfall only marginally, so the main issue was stale Oikolab source data rather than coordinate choice.
+- Found the local updater was appending recent `gfs` rows but never replacing them after Oikolab backfilled `era5`, which left April 30, 2026 badly understated in the saved series.
+- Reworked `bangalore_weather_update.R` to overwrite a 10-day trailing window on every run, query Oikolab account usage before repairs, and refresh any historical month that still contained `gfs` rainfall or temperature rows using `model=era5`.
+- Ran the repair pass within quota, replacing historical `gfs` rows in `data/bangaloreRainfall.RData` and `data/bangaloreTemperature.RData`; after the repair both files are fully `era5`, while `data/bangaloreWind.RData` keeps only the expected recent `gfs` tail.
+- Verified the corrected saved data now shows `2026-04-30` rainfall of about `8.85 mm` at the project coordinate instead of the stale low value from the pre-repair dataset.
+<!-- codex-session:2026-05-16-oikolab-era5-repair:end -->
