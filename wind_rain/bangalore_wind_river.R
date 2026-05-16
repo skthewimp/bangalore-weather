@@ -67,35 +67,62 @@ sector_colors <- c(
 month_starts <- yday(ymd(paste0("2023-", sprintf("%02d", 1:12), "-01")))
 month_labs <- month.abb
 
-# Inline labels: place each sector at the *centre of its peak window* - the
-# midpoint of all DOYs where its share is within 80% of that sector's max.
-# This pulls labels off chart edges and separates same-time peaks.
+# Inline labels: place each sector's label at the DOY where its band is
+# fattest (argmax of smoothed share). Guarantees the label sits inside its
+# region rather than in a valley between bimodal peaks.
 stack_df <- doy_dist %>%
   filter(!is.na(FreqSmooth)) %>%
   arrange(DOY, Sector) %>%
   mutate(CumTop = cumsum(FreqSmooth), .by = DOY) %>%
   mutate(MidY = CumTop - FreqSmooth / 2)
 
-labels_df <- stack_df %>%
+# For each sector: find longest contiguous run of "fat" days (>=70% of peak),
+# pick the centre of that run, then take the *median* MidY across the run so
+# the label isn't sensitive to single-day stack jitter at the chosen DOY.
+fat_runs <- stack_df %>%
   group_by(Sector) %>%
-  mutate(PeakMax = max(FreqSmooth, na.rm = TRUE)) %>%
-  filter(FreqSmooth >= 0.8 * PeakMax) %>%
-  summarise(
-    DOY = round(median(DOY)),
-    PeakMax = first(PeakMax)
+  arrange(DOY, .by_group = TRUE) %>%
+  mutate(
+    PeakMax = max(FreqSmooth, na.rm = TRUE),
+    Fat = FreqSmooth >= 0.7 * PeakMax,
+    RunId = cumsum(c(1, diff(Fat) != 0)) * Fat
   ) %>%
+  filter(Fat) %>%
+  group_by(Sector, RunId) %>%
+  mutate(RunLen = n()) %>%
+  group_by(Sector) %>%
+  filter(RunLen == max(RunLen)) %>%
   ungroup()
 
-# Get the actual MidY at the chosen DOY for each sector
-labels_df <- labels_df %>%
-  inner_join(stack_df %>% select(Sector, DOY, FreqSmooth, MidY),
-             by = c("Sector", "DOY")) %>%
-  filter(PeakMax >= 5)  # drop sectors whose peak is too thin to label cleanly
+label_doy <- fat_runs %>%
+  group_by(Sector) %>%
+  summarise(LabelDOY = round(median(DOY)), PeakMax = first(PeakMax)) %>%
+  ungroup()
+
+# Build label data: one row per (DOY, Sector) but text only shown on the
+# matching sector's labeling DOY. Using position_stack(vjust = 0.5) so ggplot
+# computes the band centre exactly as it stacks the geom_area below.
+labels_df <- doy_dist %>%
+  inner_join(label_doy, by = c("Sector" = "Sector"), relationship = "many-to-many") %>%
+  filter(DOY == LabelDOY) %>%
+  mutate(Label = ifelse(Sector == Sector, as.character(Sector), ""))
+
+# For each LabelDOY x, we need the full stack of all sectors at that x so
+# position_stack centres correctly. Build that:
+plot_labels <- label_doy %>%
+  rename(LabelSector = Sector) %>%
+  rowwise() %>%
+  mutate(rows = list(doy_dist %>% filter(DOY == LabelDOY))) %>%
+  unnest(rows) %>%
+  ungroup() %>%
+  mutate(Label = ifelse(Sector == LabelSector, as.character(Sector), ""))
 
 p <- ggplot(doy_dist, aes(x = DOY, y = FreqSmooth, fill = Sector)) +
   geom_area(position = "stack", color = NA) +
   geom_text(
-    data = labels_df, aes(x = DOY, y = MidY, label = Sector),
+    data = plot_labels,
+    aes(x = DOY, y = FreqSmooth, group = Sector, label = Label),
+    position = position_stack(vjust = 0.5),
     color = "white", fontface = "bold", size = 4, inherit.aes = FALSE
   ) +
   scale_x_continuous(

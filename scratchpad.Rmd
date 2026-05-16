@@ -1,0 +1,197 @@
+---
+title: "Weather notebook"
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+load('~/Documents/work/data work/bangalore/weather/data/bangaloreRainfall.RData')
+load('~/Documents/work/data work/bangalore/weather/data/bangaloreTemperature.RData')
+load('~/Documents/work/data work/bangalore/weather/data/bangaloreWind.RData')
+```
+
+```{r}
+blrWind
+```
+
+  Look at the avg wind speed by day of the year 
+  
+```{r}
+blrWind %>%
+  mutate(
+    Day = day(DT),
+    Month = month(DT),
+    Wind = as.numeric(Wind)
+  ) %>%
+  summarise(
+    WindSpeed = mean(Wind, na.rm=T),
+    .by = c(Day, Month)
+  ) %>%
+  mutate(
+    Year = year(Sys.Date()),
+    Dt = make_date(Year, Month, Day)
+  ) %>%
+  ggplot(aes(x = Dt, y = WindSpeed)) + geom_point() + geom_line() + scale_x_date(date_breaks = '1 month', date_labels = '%b')
+```
+  
+  Comapre to this year
+  
+```{r}
+blrWind %>%
+  filter(DT < Sys.Date()) %>%
+  mutate(
+    Year = year(Sys.Date()),
+    Day = day(DT),
+    Month = month(DT),
+    Wind = as.numeric(Wind)
+  ) %>%
+  summarise(
+    WindSpeed = mean(Wind[year(DT) < Year], na.rm=T),
+    WindSpeedThisYear = mean(Wind[year(DT) == Year], na.rm=T),
+    .by = c(Day, Month, Year)
+  ) %>%
+  mutate(
+    DT = make_date(Year, Month, Day)
+  )  %>%
+  ggplot(aes(x = DT, y = WindSpeed)) + geom_point() + geom_line() + scale_x_date(date_breaks = '1 month', date_labels = '%b') + geom_line(aes(y = WindSpeedThisYear), col = 'red')
+
+```
+  
+
+Yearly average temperatures by day overlaid with this year 
+
+```{r}
+blrTemp %>%
+  filter(DT < Sys.Date()) %>%
+  mutate(
+    Year = year(DT),
+    Day = day(DT),
+    Month = month(DT),
+    Temp = as.numeric(Temp)
+  ) %>%
+  summarise(
+    AvgTemp = mean(Temp, na.rm=T),
+    .by = c(Day, Month, Year)
+  ) %>%
+  mutate(
+    Year1 = year(Sys.Date()),
+    DT = make_date(Year1, Month, Day),
+    ThisYear = Year == Year1
+  )  %>%
+  ggplot(aes(x = DT, y = AvgTemp, group = Year)) + geom_line(aes(col =  ThisYear), linewidth = 0.1) + scale_colour_manual(values = c('grey', 'black')) + theme_minimal() +  scale_x_date(date_breaks = '1 month', date_labels = '%b') + theme(legend.position = 'none')
+```
+
+What is the likelihood of raining in the evenings in May? And how does this vary by month? 
+
+
+```{r}
+blrRain %>%
+  filter(month(DT) == 5) %>% 
+  filter(hour(DT) >= 15 & hour(DT) <= 18) %>% 
+  mutate(Hour = hour(DT)) %>%
+  summarise(
+    RainProb = mean(Rain > 1),
+    .by = Hour
+  )
+```
+
+And now by how the month goes as well 
+
+```{r}
+blrRain %>%
+  filter(month(DT) == 5) %>% 
+  filter(hour(DT) >= 15 & hour(DT) <= 18) %>% 
+  mutate(Hour = hour(DT), Day = day(DT), Rain = as.numeric(Rain)) %>%
+  summarise(
+    RainProb = mean(Rain > 1),
+    .by = c(Hour, Day)
+  ) %>% 
+  ggplot(aes(x = Day, y= RainProb)) + geom_point() + geom_line() + facet_wrap(~Hour)
+```
+
+What matters is the likelihood that it will rain sometime in this window - not at a specific time
+
+
+```{r}
+blrRain %>%
+  filter(month(DT) == 5) %>% 
+  filter(hour(DT) >= 15 & hour(DT) < 18) %>% 
+  mutate(Year = year(DT), Day = day(DT), Rain =as.numeric(Rain)) %>%
+  summarise(
+    Rain = sum(Rain), .by = c(Year, Day)
+  ) %>%
+  summarise(
+    RainProb = mean(Rain > 1),
+    .by = Day
+  ) %>% 
+  ggplot(aes(x = Day, y= RainProb)) + geom_point() + geom_line() + theme_minimal() + scale_y_continuous(lim =c(0,1)) + geom_smooth() 
+```
+
+What if i put limit to 2mm? or 3mm? or 5mm? 
+
+```{r}
+blrRain %>%
+  filter(month(DT) == 5) %>% 
+  filter(hour(DT) >= 15 & hour(DT) < 18) %>% 
+  mutate(Year = year(DT), Day = day(DT), Rain = as.numeric(Rain)) %>%
+  summarise(
+    Rain = sum(Rain), .by = c(Year, Day)
+  ) %>%
+  crossing(
+    Limit = 2:5
+  ) %>%
+  summarise(
+    RainProb = mean(Rain > Limit),
+    .by = c(Day, Limit)
+  ) %>% 
+  ggplot(aes(x = Day, y= RainProb)) + geom_point() + geom_line() + theme_minimal() + scale_y_continuous(lim =c(0,1)) + geom_smooth() + facet_wrap(~Limit)
+```
+
+Just summarise
+
+```{r}
+blrRain %>%
+  filter(month(DT) == 5) %>% 
+  filter(hour(DT) >= 15 & hour(DT) < 18) %>% 
+  mutate(Year = year(DT), Day = day(DT), Rain = as.numeric(Rain)) %>%
+  summarise(
+    Rain = sum(Rain), .by = c(Year, Day)
+  ) %>%
+  crossing(
+    Limit = 1:5
+  ) %>%
+  summarise(
+    RainProb = mean(Rain > Limit),
+    .by = c(Limit)
+  ) 
+```
+
+Look at 7pm temperatures through the year. Compare this year to average
+
+```{r}
+blrTemp %>%
+  filter(DT < Sys.Date()) %>%
+  filter(hour(DT) == 19) %>%
+  mutate(
+    Year = year(DT),
+    Day = day(DT),
+    Month = month(DT),
+    Temp = as.numeric(Temp)
+  ) %>%
+  mutate(
+    AvgTemp = median(Temp, na.rm=T),
+    ThisTemp = Temp[Year == max(Year)][1], 
+    .by = c(Day, Month)
+  ) %>%
+  mutate(
+    Year1 = year(Sys.Date()),
+    DT = make_date(Year1, Month, Day),
+    ThisYear = Year == Year1,
+    ThisTemp = ifelse(Year == Year1, ThisTemp, NA)
+  )  %>%
+  ggplot(aes(x = DT, y = Temp, group = Year)) + geom_line(linewidth = 0.05) + geom_line(aes(y = AvgTemp), linewidth = 0.5, col = "#490000", lty = 2) + geom_line(aes(y = ThisTemp), linewidth = 0.7, col = "#490000")  + theme_minimal() +  scale_x_date(date_breaks = '1 month', date_labels = '%b') + theme(legend.position = 'none') +  ggtitle("Bangalore 7 pm temperature") + theme_tufte() + 
+  theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold', size = 7), axis.line.y = element_line(colour = 'black', linewidth = 0.2),  panel.background = element_rect(fill = "#eae4db", linewidth = 0), plot.background = element_rect(fill = "#eae4db") )
+```
+
+
+
