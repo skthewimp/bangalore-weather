@@ -23,6 +23,8 @@ script_dir <- tryCatch({
   }
 })
 
+source(file.path(script_dir, "weather_chart_common.R"))
+
 primKey <- Sys.getenv("OIKOLAB_PRIMARY")
 secKey <- Sys.getenv("OIKOLAB_SECONDARY")
 load(file.path(script_dir, 'data', 'bangaloreRainfall.RData'))
@@ -466,156 +468,19 @@ commentary <- tryCatch({
 }, error = function(e) { message("Claude API call failed: ", e$message); NULL })
 
 
-blrTemp %>%
-  mutate(
-    DT = as.Date(DT),
-    Month = month(DT),
-    Day = day(DT),
-    Temp = as.numeric(Temp)
-  ) %>%
-  mutate(
-    High = max(Temp),
-    Low = min(Temp),
-    .by = DT
-  ) %>%
-  summarise(
-    RecordHigh = max(Temp),
-    RecordLow = min(Temp),
-    NormalHigh = median(High),
-    NormalLow = median(Low),
-    High2022 = max(Temp[year(DT) == curr_year]),
-    Low2022 = min(Temp[year(DT) == curr_year]),
-    .by = c(Month,Day)
-  ) %>%
-  mutate(
-    Date = make_date(curr_year, Month, Day),
-    High2022 = ifelse(is.infinite(High2022),NormalHigh, High2022),
-    Low2022 = ifelse(is.infinite(Low2022),NormalHigh, Low2022),
-    Special = case_when(
-      High2022 >= RecordHigh ~ paste("Hottest", format(Date, "%b-%d"), "since 1980"),
-      Low2022 <= RecordLow ~ paste("Coldest", format(Date, "%b-%d"), "since 1980"),
-      .default = ""
-    )
-  ) %>%
-  ggplot() +
-  geom_segment(aes(x = Date, xend = Date, y = RecordLow, yend = RecordHigh), linewidth = 1, col = "#d4cbaa")+
-  geom_segment(aes(x = Date, xend = Date, y = NormalLow, yend = NormalHigh), linewidth = 1, col = '#888888') +
-  geom_segment(aes(x = Date, xend = Date, y = Low2022, yend = High2022), linewidth = 1, col = "#490000",alpha = 0.9) +
-  ggrepel::geom_text_repel(aes(x = Date, y = NormalHigh, label = str_wrap(Special, 10)), size = 2.5, direction = 'y')  +
-  scale_x_date("", lim = c(floor_date(as.Date(paste0(curr_year, '-01-01')), '1 year'), ceiling_date(as.Date(paste0(curr_year, '-12-31')), '1 year')),  breaks = seq(as.Date(paste0(curr_year, '-01-15')), as.Date(paste0(curr_year, '-12-15')), by = '1 month'), labels = ~ toupper(format(.x, "%B")), position = 'top', expand = expansion(mult = 0)) +
-  scale_y_continuous("", breaks = seq(10, 42, 4) )  +
-  ggthemes::theme_tufte()  +
-  theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold', size = 7), axis.line.y = element_line(colour = 'black', linewidth = 0.2),  panel.background = element_rect(fill = "#eae4db", linewidth = 0), plot.background = element_rect(fill = "#eae4db") ) +
-  annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 38, label = "Temperature", hjust = 0, fontface = 'bold', size = 3) +
-  annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 37.5, label = str_wrap("Bars represent range between the daily high and low", 40), hjust = 0, vjust = 1, size = 2.5) +
-  annotate("text", x = Sys.Date() - 14, y = 37, label = "RECORD HIGH", hjust = 0, size = 2, fontface = 'bold', color = "#b0a882") +
-  annotate("text", x = Sys.Date() - 14, y = 34, label = "ACTUAL HIGH", hjust = 0, size = 2, fontface = 'bold', color = "#490000") +
-  annotate("text", x = Sys.Date() - 14, y = 27, label = "NORMAL RANGE", hjust = 0, size = 2, fontface = 'bold', color = "#888888") +
-  annotate("text", x = Sys.Date() - 14, y = 20, label = "ACTUAL LOW", hjust = 0, size = 2, fontface = 'bold', color = "#490000") +
-  annotate("text", x = Sys.Date() - 14, y = 15, label = "RECORD LOW", hjust = 0, size = 2, fontface = 'bold', color = "#b0a882") ->
-  tempPlot
+temp_data <- build_temperature_plot_data(blrTemp, curr_year)
+rain_data <- build_rain_plot_data(blrRain, curr_year)
 
-
-blrRain %>%
-  mutate(
-    Rain = as.numeric(Rain),
-    DT = as.Date(DT)
-  ) %>%
-  summarise(
-    Rain = sum(Rain),
-    .by = DT
-  ) %>%
-  mutate(
-    Year = year(DT),
-    Month = month(DT),
-    Day = day(DT),
-    MonthYear = floor_date(DT, '1 month')
-  ) %>%
-  mutate(
-    MonthlyRain = sum(Rain),
-    .by = MonthYear
-  ) %>%
-  mutate(
-    DailyAvg = mean(Rain),
-    DailyMax = max(Rain),
-    .by = c(Month, Day)
-  ) %>%
-  mutate(
-    MonthlyAvg = mean(MonthlyRain),
-    MonthlyMax = max(MonthlyRain),
-    .by = Month
-  ) %>%
-  arrange(DT) %>%
-  mutate(
-    CumulRainYM = cumsum(Rain),
-    .by = c(Year, Month)
-  ) %>%
-  mutate(
-    CumulMin = quantile(CumulRainYM, 0.10),
-    CumulMax = quantile(CumulRainYM, 0.90),
-    .by = c(Month, Day)
-  ) %>%
-  filter(Year == curr_year) %>%
-  mutate(
-    CumulRain = CumulRainYM,
-    CumulAvg = cumsum(DailyAvg),
-    .by = Month
-  ) %>%
-  mutate(
-    normalLabel = case_when(
-      Day == 1 & Month == 10 ~ paste("Normal", round(MonthlyAvg, 0), sep = '\n'),
-      Day == 1 ~ as.character(round(MonthlyAvg, 0)),
-      .default = ""
-    ),
-    actualLabel = case_when(
-      Day == max(Day) & Month == 10 ~ paste("Actual", round(CumulRain, 0), sep = '\n'),
-      Day == max(Day) ~ as.character(round(CumulRain, 0)),
-      .default = ""
-    ),
-    MonthLabel = ifelse(CumulRain == MonthlyMax & Day == 15, paste("Wettest", month.name[Month], "since 1981"), ""),
-    .by = Month
-  ) %>%
-  mutate(
-    DayLabel = ifelse(Rain == DailyMax, paste0("Record ", month.name[Month], "-", Day, "; ", round(Rain, 0), " mm"), ""),
-    .by = c(Month, Day)
-  ) %>%
-  mutate(
-    Label = case_when(
-      DayLabel != "" ~ DayLabel,
-      MonthLabel != "" ~ MonthLabel,
-      .default = ""
-    )
-  ) %>%
-  ggplot(aes(x = DT)) +
-  geom_ribbon(aes(ymin = CumulMin, ymax = CumulMax, group = Month), fill = "#6699CC", alpha = 0.2) +
-  geom_segment(aes(x = DT, xend = DT, y = CumulRain - Rain, yend = CumulRain), linewidth = 1, col = '#2255AA') +
-  geom_step(aes(y = MonthlyAvg, group = Month), lwd = 1, col = '#4477BB') +
-  geom_text(aes(y = MonthlyAvg, label = normalLabel), vjust = -0.05, hjust = 0, size = 2.5, fontface = 'bold') +
-  geom_text(aes(y = CumulRain, label = actualLabel), vjust = -0.05, hjust = 1, size = 2.5, fontface = 'bold') +
-  ggrepel::geom_text_repel(aes(y = CumulRain, label = str_wrap(Label, 10)), size = 2,  fontface = 'bold') +
-  scale_x_date("", lim = c(floor_date(as.Date(paste0(curr_year, '-01-01')), '1 year'), ceiling_date(as.Date(paste0(curr_year, '-12-31')), '1 year')),  breaks = seq(as.Date(paste0(curr_year, '-01-15')), as.Date(paste0(curr_year, '-12-15')), by = '1 month'), labels = ~ toupper(format(.x, "%B")), expand = expansion(mult = 0)) +
-  ggthemes::theme_tufte() +
-  theme(panel.grid = element_blank(), axis.ticks.x = element_blank(), panel.grid.minor.x = element_line(colour = 'black', linewidth = 0.1), axis.text.x = element_text(face = 'bold', size = 7), axis.line.y = element_line(colour = 'black', linewidth = 0.2), panel.background = element_rect(fill = "#eae4db", linewidth = 0), plot.background = element_rect(fill = "#eae4db") ) +
-  scale_y_continuous("", breaks = seq(0,500, 50)) +
-  annotate("text", x = as.Date(paste0(curr_year, '-01-05')), y = 260, label = "Precipitation", hjust = 0, fontface = 'bold', size = 3) +
-  annotate("text", x = as.Date(paste0(curr_year, '-02-05')), y = 260, label = str_wrap("Cumulative monthly precipitation in mm compared with normal monthly precipitation. Blue band shows historical range.", 1000), hjust = 0,  size = 2.5)  ->
-  rainPlot
-
-combined <- tempPlot + rainPlot +
-  plot_layout(ncol = 1, heights = c(70, 30)) +
-  plot_annotation(
-    title = paste0("Bangalore's Weather in ", curr_year, ", as of ", format(Sys.Date(), "%B %d")),
-    subtitle = commentary,
-    caption = "Data source: Oikolab"
-  ) &
-  theme(
-    plot.title = element_text(face = 'bold', hjust = 0),
-    plot.subtitle = element_text(size = 8, color = "#490000", hjust = 0, margin = margin(t = 2, b = 4)),
-    panel.background = element_rect(fill = "#eae4db"),
-    plot.background = element_rect(fill = "#eae4db", linewidth = 0)
-  )
+combined <- render_weather_chart(
+  temp_data = temp_data,
+  rain_data = rain_data,
+  curr_year = curr_year,
+  title = paste0("Bangalore's Weather in ", curr_year, ", as of ", format(Sys.Date(), "%B %d")),
+  subtitle = commentary,
+  caption = "Data source: Oikolab"
+)
 
 outfile <- file.path(script_dir, 'charts', paste0('bangalore_weather_', format(Sys.Date(), '%Y%m%d'), '.png'))
-ggsave(outfile, combined, width = 12, height = 6)
+ggsave(outfile, combined, width = 13.5, height = 7.5)
 message("Saved: ", outfile)
 combined
