@@ -245,6 +245,14 @@ fmt_run <- function(label, run) {
          format(run$end, "%b %d"), ")")
 }
 
+fmt_short_range <- function(start, end) {
+  if (month(start) == month(end)) {
+    paste0(format(start, "%b %d"), "-", format(end, "%d"))
+  } else {
+    paste0(format(start, "%b %d"), "-", format(end, "%b %d"))
+  }
+}
+
 build_weather_window_text <- function(start_date, end_date, temp_daily, rain_daily) {
   anchor_year <- year(end_date)
   hist_cutoff <- as.Date(paste0(anchor_year, "-01-01"))
@@ -262,23 +270,65 @@ build_weather_window_text <- function(start_date, end_date, temp_daily, rain_dai
   norms_rain_by_day <- hist_rain %>%
     summarise(NormalRain = sum(Rain) / n_distinct(year(DT)), .by = c(Month, Day))
 
-  window_daily <- recent_temp %>%
-    left_join(recent_rain %>% select(DT, Rain), by = "DT") %>%
-    mutate(Rain = coalesce(Rain, 0)) %>%
-    left_join(norms_temp_by_day, by = c("Month", "Day")) %>%
-    left_join(norms_rain_by_day, by = c("Month", "Day")) %>%
-    arrange(DT) %>%
-    mutate(
-      HighDev = High - NormalHigh,
-      LowDev = Low - NormalLow,
-      RainDev = Rain - NormalRain
-    )
+  build_daily_context <- function(temp_scope, rain_scope) {
+    temp_scope %>%
+      left_join(rain_scope %>% select(DT, Rain), by = "DT") %>%
+      mutate(Rain = coalesce(Rain, 0)) %>%
+      left_join(norms_temp_by_day, by = c("Month", "Day")) %>%
+      left_join(norms_rain_by_day, by = c("Month", "Day")) %>%
+      arrange(DT) %>%
+      mutate(
+        HighDev = High - NormalHigh,
+        LowDev = Low - NormalLow,
+        RainDev = Rain - NormalRain
+      )
+  }
+
+  window_daily <- build_daily_context(recent_temp, recent_rain)
 
   window_n <- nrow(window_daily)
   total_rain <- sum(window_daily$Rain)
   rainy_days <- sum(window_daily$Rain >= 0.1)
   normal_total_rain <- sum(window_daily$NormalRain)
   normal_rainy_days <- mean(window_daily$NormalRain >= 0.1) * window_n
+
+  label_window <- function(label, start, end, df = window_daily) {
+    scoped <- df %>% filter(DT >= start, DT <= end)
+    if (nrow(scoped) == 0) return(NULL)
+    actual_rain <- sum(scoped$Rain)
+    normal_rain <- sum(scoped$NormalRain)
+    rain_pct_text <- if (normal_rain > 0) {
+      paste0(
+        "; ", sprintf("%.0f", 100 * (1 - actual_rain / normal_rain)),
+        "% below normal; ", sprintf("%.0f", 100 * actual_rain / normal_rain),
+        "% of normal"
+      )
+    } else {
+      ""
+    }
+    paste0(
+      label, " (", format(start, "%b %d"), " - ", format(end, "%b %d"), "): ",
+      sprintf("%.1f", actual_rain), "mm rain vs normal ~",
+      sprintf("%.1f", normal_rain), "mm", rain_pct_text, "; ",
+      sum(scoped$Rain >= 0.1), " rainy days of ", nrow(scoped)
+    )
+  }
+
+  month_start <- floor_date(end_date, "month")
+  month_temp <- temp_daily %>% filter(DT >= month_start, DT <= end_date)
+  month_rain <- rain_daily %>% filter(DT >= month_start, DT <= end_date)
+  month_daily <- build_daily_context(month_temp, month_rain)
+
+  named_window_text <- c(
+    label_window(paste0("Last ", window_n, " days"), start_date, end_date),
+    if (nrow(month_daily) > 0) {
+      label_window(paste0(format(end_date, "%B"), " so far"), month_start, end_date, month_daily)
+    } else {
+      NULL
+    }
+  ) %>%
+    discard(is.null) %>%
+    paste(collapse = "\n")
 
   daily_table <- window_daily %>%
     mutate(line = paste0(
@@ -332,25 +382,117 @@ build_weather_window_text <- function(start_date, end_date, temp_daily, rain_dai
     ante_streak(window_daily$Rain < 0.1,  function(r) r >= 0.1, "Wet streak preceding first dry day in window")
   ) %>% discard(is.null) %>% paste(collapse = "\n")
 
-  hist_records <- hist_temp %>%
+  hist_temp_records <- hist_temp %>%
     summarise(RecHigh = max(High), RecLow = min(Low), .by = c(Month, Day))
+  hist_rain_records <- hist_rain %>%
+    summarise(RecRain = max(Rain), .by = c(Month, Day))
 
-  record_detail <- recent_temp %>%
-    left_join(hist_records, by = c("Month", "Day")) %>%
+  ytd_temp <- temp_daily %>%
+    filter(year(DT) == anchor_year, DT <= end_date)
+  ytd_rain <- rain_daily %>%
+    filter(year(DT) == anchor_year, DT <= end_date)
+
+  temp_record_detail <- ytd_temp %>%
+    left_join(hist_temp_records, by = c("Month", "Day")) %>%
     filter(!is.na(RecHigh) & (High > RecHigh | Low < RecLow)) %>%
     mutate(
+      record_date = DT,
+      record_type = case_when(
+        High > RecHigh ~ "high",
+        Low < RecLow ~ "low"
+      ),
+      value = case_when(
+        record_type == "high" ~ High,
+        record_type == "low" ~ Low
+      ),
       detail = case_when(
-        High > RecHigh ~ paste0(format(DT, "%b %d"), ": high of ", round(High, 1), "\u00B0C broke record of ", round(RecHigh, 1), "\u00B0C"),
-        Low < RecLow ~ paste0(format(DT, "%b %d"), ": low of ", round(Low, 1), "\u00B0C broke record of ", round(RecLow, 1), "\u00B0C")
+        record_type == "high" ~ paste0(format(DT, "%b %d"), ": high of ", round(High, 1), "\u00B0C broke record of ", round(RecHigh, 1), "\u00B0C"),
+        record_type == "low" ~ paste0(format(DT, "%b %d"), ": low of ", round(Low, 1), "\u00B0C broke record of ", round(RecLow, 1), "\u00B0C")
       )
-    )
+    ) %>%
+    select(record_date, record_type, value, detail)
+
+  rain_record_detail <- ytd_rain %>%
+    left_join(hist_rain_records, by = c("Month", "Day")) %>%
+    filter(!is.na(RecRain) & Rain > RecRain & Rain > 0) %>%
+    mutate(
+      record_date = DT,
+      record_type = "rain",
+      value = Rain,
+      detail = paste0(format(DT, "%b %d"), ": rain of ", round(Rain, 1), "mm broke record of ", round(RecRain, 1), "mm")
+    ) %>%
+    select(record_date, record_type, value, detail)
+
+  record_detail <- bind_rows(temp_record_detail, rain_record_detail) %>%
+    arrange(record_date, record_type)
 
   record_text <- if (nrow(record_detail) > 0) {
-    paste0("Record-breaking days (since 1981):\n", paste(record_detail$detail, collapse = "\n"), "\n")
+    paste0("Year-to-date record-breaking days (since 1981):\n", paste(record_detail$detail, collapse = "\n"), "\n")
   } else ""
+
+  rain_pct_below <- if (normal_total_rain > 0) {
+    sprintf("%.0f", 100 * (1 - total_rain / normal_total_rain))
+  } else {
+    NA_character_
+  }
+  rain_bullet <- if (!is.na(rain_pct_below)) {
+    paste0(
+      "* ", fmt_short_range(start_date, end_date), " had ",
+      sprintf("%.1f", total_rain), "mm rain, ", rain_pct_below, "% below normal"
+    )
+  } else {
+    paste0(
+      "* ", fmt_short_range(start_date, end_date), " had ",
+      sprintf("%.1f", total_rain), "mm rain"
+    )
+  }
+
+  streak_bullet <- function(run, values, label) {
+    if (is.null(run) || run$len < 3) return(NULL)
+    scoped_values <- values[window_daily$DT >= run$start & window_daily$DT <= run$end]
+    paste0(
+      "* ", fmt_short_range(run$start, run$end), " ", label, " averaged ",
+      sprintf("%.1f", mean(scoped_values, na.rm = TRUE)), "\u00B0C above normal"
+    )
+  }
+
+  warm_night_bullet <- streak_bullet(
+    longest_run(window_daily$LowDev >= 2, window_daily$DT),
+    window_daily$LowDev,
+    "nights"
+  )
+  hot_day_bullet <- streak_bullet(
+    longest_run(window_daily$HighDev >= 2, window_daily$DT),
+    window_daily$HighDev,
+    "highs"
+  )
+  record_bullet <- if (nrow(record_detail) > 0) {
+    first_record <- record_detail %>%
+      arrange(desc(record_date)) %>%
+      slice(1)
+    if (first_record$record_type[[1]] == "rain") {
+      paste0(
+        "* ", format(first_record$record_date[[1]], "%b %d"), " had ",
+        sprintf("%.1f", first_record$value[[1]]), "mm rain, a date record since 1981"
+      )
+    } else {
+      paste0(
+        "* ", format(first_record$record_date[[1]], "%b %d"), " hit ",
+        sprintf("%.1f", first_record$value[[1]]), "\u00B0C, a date record since 1981"
+      )
+    }
+  } else {
+    NULL
+  }
+  fallback_commentary <- c(rain_bullet, warm_night_bullet, hot_day_bullet, record_bullet) %>%
+    discard(is.null) %>%
+    head(3) %>%
+    paste(collapse = "\n")
 
   facts_text <- paste0(
     "Period: ", format(start_date, "%b %d"), " - ", format(end_date, "%b %d, %Y"), "\n",
+    "\nNAMED WINDOWS FOR WORDING\n",
+    named_window_text, "\n",
     "\nWINDOW SUMMARY\n",
     "Avg daily high: ", sprintf("%.1f", mean(window_daily$High)), "\u00B0C (normal ", sprintf("%.1f", mean(window_daily$NormalHigh)), "\u00B0C)\n",
     "Avg daily low: ",  sprintf("%.1f", mean(window_daily$Low)),  "\u00B0C (normal ", sprintf("%.1f", mean(window_daily$NormalLow)),  "\u00B0C)\n",
@@ -367,7 +509,8 @@ build_weather_window_text <- function(start_date, end_date, temp_daily, rain_dai
     facts = facts_text,
     start_date = start_date,
     end_date = end_date,
-    window_n = window_n
+    window_n = window_n,
+    fallback_commentary = fallback_commentary
   )
 }
 
@@ -416,9 +559,31 @@ normalize_commentary_text <- function(text) {
     str_replace_all("[\u201C\u201D]", "\"")
 }
 
+has_ambiguous_window_text <- function(text) {
+  str_detect(
+    str_to_lower(text),
+    "\\b(this|that|the) window\\b|\\b(this|that|the) period\\b"
+  )
+}
+
+has_overstated_weather_text <- function(text) {
+  str_detect(
+    str_to_lower(text),
+    "\\bdrought\\b|\\bgripped\\b|\\bsevere\\b|\\btrapping heat\\b|\\bmonsoon\\b|\\bpre-?monsoon\\b|\\bparched\\b"
+  )
+}
+
+has_muddled_subtitle_text <- function(text) {
+  str_detect(
+    str_to_lower(text),
+    "\\botherwise\\b|\\binterrupted\\b|\\bfortnight\\b|;|,"
+  )
+}
+
 # --- Recent commentary ---
 recent_window <- 14
-live_end_date <- Sys.Date() - 1
+available_daily_dates <- intersect(temp_daily$DT, rain_daily$DT)
+live_end_date <- max(available_daily_dates[available_daily_dates < Sys.Date()])
 live_start_date <- live_end_date - (recent_window - 1)
 live_context <- build_weather_window_text(live_start_date, live_end_date, temp_daily, rain_daily)
 recent_facts <- live_context$facts
@@ -436,8 +601,13 @@ commentary <- tryCatch({
       "Choose the 2-3 most noteworthy signals from the data. The interesting story might be a multi-day rain stretch, a long dry spell broken by sudden rain, a heat or cool streak, a record day, an unusually warm night pattern, a sustained departure from normal, or something else entirely. Pick whatever is most striking; do not default to any one frame. ",
       "A reviewed example may overturn the naive label suggested by totals alone: if most rain came in one burst, lead with that burst; if rain triggered a sharp cool-down, mention the temperature effect; if records dominate most days, lead with records; if a dry spell is the story, pair duration with shortfall; if rain fell on nearly every day, say that directly. ",
       "Use the per-day deviations to judge what is unusual. If a signal exists in the data (e.g. a 30-day antecedent dry streak, or 5 consecutive nights >=2\u00B0C above normal), you must surface it - do not blur it into a window average. Do not call a window 'trace rainfall' if a single day or short stretch carried most of it; describe what actually happened. ",
+      "Record-breaking high, low, and rain facts are year-to-date for the chart year, not just the recent commentary window. ",
       "Each bullet must be under 15 words, start with '\u2022 ', and use \u00B0C. ",
-      "Never say 'this period' or 'the period'. Use specific dates like '", format(live_start_date, "%b %d"), " - ", format(live_end_date, "%b %d"), "' or 'late March' etc. ",
+      "Never say 'this window', 'that window', 'the window', 'this period', or 'the period'. Use only named windows supplied in the facts, such as 'last 14 days', '", format(live_end_date, "%B"), " so far', exact dates like '", format(live_start_date, "%b %d"), " - ", format(live_end_date, "%b %d"), "', or logical phrases like 'late March'. ",
+      "Any rainfall total or percentage you mention must match the named window in the same bullet. Do not calculate percentages yourself; use only the percentages supplied in NAMED WINDOWS FOR WORDING. ",
+      "Do not infer named climate seasons such as monsoon or pre-monsoon unless the facts explicitly provide that label; use calendar wording instead. ",
+      "Do not use dramatic labels such as drought, severe, gripped, or trapping heat; say dry, rain shortfall, or warmer nights instead. ",
+      "Keep each bullet as one simple readable claim. Avoid semicolons, nested clauses, 'otherwise', 'interrupted', and 'fortnight'. ",
       "Plain, calm tone. No hyperbole. Output only the 3 bullets, nothing else."
     ),
     messages = c(
@@ -463,7 +633,21 @@ commentary <- tryCatch({
     lines <- strsplit(raw, "\n")[[1]]
     bullet_lines <- lines[grepl("^\u2022", trimws(lines))]
     if (length(bullet_lines) == 0) NULL
-    else normalize_commentary_text(paste(trimws(bullet_lines), collapse = "\n"))
+    else {
+      candidate <- normalize_commentary_text(paste(trimws(bullet_lines), collapse = "\n"))
+      if (has_ambiguous_window_text(candidate)) {
+        message("Claude commentary used ambiguous window wording. Skipping commentary.")
+        live_context$fallback_commentary
+      } else if (has_overstated_weather_text(candidate)) {
+        message("Claude commentary used overstated or inferred climate wording. Skipping commentary.")
+        live_context$fallback_commentary
+      } else if (has_muddled_subtitle_text(candidate)) {
+        message("Claude commentary used muddled subtitle wording. Skipping commentary.")
+        live_context$fallback_commentary
+      } else {
+        candidate
+      }
+    }
   }
 }, error = function(e) { message("Claude API call failed: ", e$message); NULL })
 
@@ -475,7 +659,7 @@ combined <- render_weather_chart(
   temp_data = temp_data,
   rain_data = rain_data,
   curr_year = curr_year,
-  title = paste0("Bangalore's Weather in ", curr_year, ", as of ", format(Sys.Date(), "%B %d")),
+  title = paste0("Bangalore's Weather in ", curr_year, ", as of ", format(live_end_date, "%B %d")),
   subtitle = commentary,
   caption = "Data source: Oikolab"
 )
