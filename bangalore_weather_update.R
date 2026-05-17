@@ -437,8 +437,8 @@ build_weather_window_text <- function(start_date, end_date, temp_daily, rain_dai
   }
   rain_bullet <- if (!is.na(rain_pct_below)) {
     paste0(
-      "* ", fmt_short_range(start_date, end_date), " had ",
-      sprintf("%.1f", total_rain), "mm rain, ", rain_pct_below, "% below normal"
+      "* ", fmt_short_range(start_date, end_date), " was almost dry: ",
+      sprintf("%.1f", total_rain), "mm vs ", sprintf("%.0f", normal_total_rain), "mm normal"
     )
   } else {
     paste0(
@@ -451,7 +451,7 @@ build_weather_window_text <- function(start_date, end_date, temp_daily, rain_dai
     if (is.null(run) || run$len < 3) return(NULL)
     scoped_values <- values[window_daily$DT >= run$start & window_daily$DT <= run$end]
     paste0(
-      "* ", fmt_short_range(run$start, run$end), " ", label, " averaged ",
+      "* ", fmt_short_range(run$start, run$end), " ", label, " stayed warm: ",
       sprintf("%.1f", mean(scoped_values, na.rm = TRUE)), "\u00B0C above normal"
     )
   }
@@ -472,13 +472,13 @@ build_weather_window_text <- function(start_date, end_date, temp_daily, rain_dai
       slice(1)
     if (first_record$record_type[[1]] == "rain") {
       paste0(
-        "* ", format(first_record$record_date[[1]], "%b %d"), " had ",
-        sprintf("%.1f", first_record$value[[1]]), "mm rain, a date record since 1981"
+        "* ", format(first_record$record_date[[1]], "%b %d"), " set a rain record: ",
+        sprintf("%.1f", first_record$value[[1]]), "mm"
       )
     } else {
       paste0(
-        "* ", format(first_record$record_date[[1]], "%b %d"), " hit ",
-        sprintf("%.1f", first_record$value[[1]]), "\u00B0C, a date record since 1981"
+        "* ", format(first_record$record_date[[1]], "%b %d"), " set a date record: ",
+        sprintf("%.1f", first_record$value[[1]]), "\u00B0C"
       )
     }
   } else {
@@ -576,7 +576,7 @@ has_overstated_weather_text <- function(text) {
 has_muddled_subtitle_text <- function(text) {
   str_detect(
     str_to_lower(text),
-    "\\botherwise\\b|\\binterrupted\\b|\\bfortnight\\b|;|,"
+    "\\botherwise\\b|\\binterrupted\\b|\\bfortnight\\b|;"
   )
 }
 
@@ -602,13 +602,16 @@ commentary <- tryCatch({
       "A reviewed example may overturn the naive label suggested by totals alone: if most rain came in one burst, lead with that burst; if rain triggered a sharp cool-down, mention the temperature effect; if records dominate most days, lead with records; if a dry spell is the story, pair duration with shortfall; if rain fell on nearly every day, say that directly. ",
       "Use the per-day deviations to judge what is unusual. If a signal exists in the data (e.g. a 30-day antecedent dry streak, or 5 consecutive nights >=2\u00B0C above normal), you must surface it - do not blur it into a window average. Do not call a window 'trace rainfall' if a single day or short stretch carried most of it; describe what actually happened. ",
       "Record-breaking high, low, and rain facts are year-to-date for the chart year, not just the recent commentary window. ",
-      "Each bullet must be under 15 words, start with '\u2022 ', and use \u00B0C. ",
+      "Each bullet must be under 18 words, start with '\u2022 ', and use \u00B0C. ",
       "Never say 'this window', 'that window', 'the window', 'this period', or 'the period'. Use only named windows supplied in the facts, such as 'last 14 days', '", format(live_end_date, "%B"), " so far', exact dates like '", format(live_start_date, "%b %d"), " - ", format(live_end_date, "%b %d"), "', or logical phrases like 'late March'. ",
       "Any rainfall total or percentage you mention must match the named window in the same bullet. Do not calculate percentages yourself; use only the percentages supplied in NAMED WINDOWS FOR WORDING. ",
       "Do not infer named climate seasons such as monsoon or pre-monsoon unless the facts explicitly provide that label; use calendar wording instead. ",
       "Do not use dramatic labels such as drought, severe, gripped, or trapping heat; say dry, rain shortfall, or warmer nights instead. ",
       "Keep each bullet as one simple readable claim. Avoid semicolons, nested clauses, 'otherwise', 'interrupted', and 'fortnight'. ",
-      "Plain, calm tone. No hyperbole. Output only the 3 bullets, nothing else."
+      "Write like an observant Bangalore resident, not a lab report. Prefer concrete phrasing like 'May is still almost dry', 'warm nights are sticking around', or 'May 14 set a heat record' when supported by the data. ",
+      "Avoid bureaucratic phrasing such as 'rain shortfall of', 'against normal', 'totaled just', and 'the period saw'. ",
+      "It is okay to use mild color like 'almost dry', 'barely any rain', 'warm nights', 'record heat', or 'rain missed Bangalore' when the numbers support it. ",
+      "Plain but interesting tone. No hyperbole. Output only the 3 bullets, nothing else."
     ),
     messages = c(
       few_shot_messages,
