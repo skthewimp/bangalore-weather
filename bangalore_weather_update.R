@@ -582,12 +582,23 @@ has_muddled_subtitle_text <- function(text) {
 
 # --- Recent commentary ---
 recent_window <- 14
+temp_end_date <- max(temp_daily$DT[temp_daily$DT < Sys.Date()])
+rain_end_date <- max(rain_daily$DT[rain_daily$DT < Sys.Date()])
 available_daily_dates <- intersect(temp_daily$DT, rain_daily$DT)
 live_end_date <- max(available_daily_dates[available_daily_dates < Sys.Date()])
 live_start_date <- live_end_date - (recent_window - 1)
 live_context <- build_weather_window_text(live_start_date, live_end_date, temp_daily, rain_daily)
 recent_facts <- live_context$facts
 few_shot_messages <- build_few_shot_messages(script_dir, temp_daily, rain_daily)
+
+chart_date_text <- if (identical(temp_end_date, rain_end_date)) {
+  paste0("as of ", format(temp_end_date, "%B %d"))
+} else {
+  paste0(
+    "temperature as of ", format(temp_end_date, "%B %d"),
+    "; rain as of ", format(rain_end_date, "%B %d")
+  )
+}
 
 commentary <- tryCatch({
   body <- list(
@@ -662,7 +673,7 @@ combined <- render_weather_chart(
   temp_data = temp_data,
   rain_data = rain_data,
   curr_year = curr_year,
-  title = paste0("Bangalore's Weather in ", curr_year, ", as of ", format(live_end_date, "%B %d")),
+  title = paste0("Bangalore's Weather in ", curr_year, ", ", chart_date_text),
   subtitle = commentary,
   caption = "Data source: Oikolab"
 )
