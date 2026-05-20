@@ -637,8 +637,7 @@ commentary <- tryCatch({
     ) %>%
     req_body_json(body) %>%
     req_timeout(30) %>%
-    req_error(is_error = ~ FALSE) %>%
-    req_perform()
+    perform_claude_request_with_retries()
   if (resp_status(resp) != 200) {
     message("Claude API returned status ", resp_status(resp), ". Skipping commentary.")
     NULL

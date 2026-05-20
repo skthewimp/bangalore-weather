@@ -231,8 +231,7 @@ generate_commentary <- function(stats) {
       ) %>%
       req_body_json(body) %>%
       req_timeout(30) %>%
-      req_error(is_error = ~ FALSE) %>%
-      req_perform()
+      perform_claude_request_with_retries()
   }, error = function(e) {
     message("Claude API call failed: ", e$message, ". Skipping commentary.")
     return(NULL)

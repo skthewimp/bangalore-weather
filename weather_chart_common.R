@@ -8,6 +8,42 @@ weather_palette <- list(
   band_inner = "#b9b09d"
 )
 
+perform_claude_request_with_retries <- function(req, max_attempts = 4, initial_sleep = 5) {
+  transient_statuses <- c(408, 409, 429, 500, 502, 503, 504, 529)
+
+  for (attempt in seq_len(max_attempts)) {
+    resp <- tryCatch(
+      req %>%
+        httr2::req_error(is_error = ~ FALSE) %>%
+        httr2::req_perform(),
+      error = function(e) {
+        if (attempt == max_attempts) stop(e)
+        message(
+          "Claude API call failed on attempt ", attempt, "/", max_attempts,
+          ": ", e$message, ". Retrying."
+        )
+        NULL
+      }
+    )
+
+    if (is.null(resp)) {
+      Sys.sleep(initial_sleep * attempt)
+      next
+    }
+
+    status <- httr2::resp_status(resp)
+    if (!(status %in% transient_statuses) || attempt == max_attempts) {
+      return(resp)
+    }
+
+    message(
+      "Claude API returned transient status ", status,
+      " on attempt ", attempt, "/", max_attempts, ". Retrying."
+    )
+    Sys.sleep(initial_sleep * attempt)
+  }
+}
+
 weather_month_midpoints <- function(curr_year) {
   tibble::tibble(
     x = seq(as.Date(paste0(curr_year, "-01-15")), by = "1 month", length.out = 12),
