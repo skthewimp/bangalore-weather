@@ -47,6 +47,7 @@ sudo systemctl reload caddy
   - weird-weather archive from few-shot examples
   - neighbourhood-scale rainfall mismatch
   - October as its own rain story
+- Correction from user: do not publish "what should go up next" as a public roadmap. Those are internal analysis candidates. Each should be analyzed first, and only become a website page if the result is actually insightful.
 
 ## Session — 2026-05-16 — Tufte-style weather chart redesign
 

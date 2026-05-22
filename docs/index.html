@@ -328,28 +328,6 @@ h2 {
   color: var(--muted);
 }
 
-.idea-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.idea-card {
-  border-top: 3px solid var(--teal);
-  padding-top: 12px;
-}
-
-.idea-card h3 {
-  margin: 0 0 7px;
-  font-size: 1.08rem;
-  line-height: 1.2;
-}
-
-.idea-card p {
-  margin: 0;
-  color: var(--ink);
-}
-
 .site-footer {
   background: var(--ink);
   color: #f7f4ed;
@@ -386,7 +364,6 @@ h2 {
   .section-head,
   .analysis-item,
   .request-panel,
-  .idea-grid,
   .source-list {
     grid-template-columns: 1fr;
   }
@@ -425,7 +402,6 @@ h2 {
     <div class="nav-links">
       <a href="#today">Today</a>
       <a href="#analysis">Analysis</a>
-      <a href="#next">Next</a>
       <a href="#archive">Years</a>
       <a href="#requests">Questions</a>
       <a href="#data">Data</a>
@@ -543,66 +519,6 @@ h2 {
           </div>
         </article>
 
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="next">
-    <div class="section-inner">
-      <div class="section-head">
-        <h2>What should go up next</h2>
-        <p>
-          Before the question box starts producing ideas, there are already a few pieces hiding
-          in this repo that deserve to become proper website pages rather than stray scripts.
-        </p>
-      </div>
-      <div class="idea-grid">
-        <article class="idea-card">
-          <h3>Are Bangalore nights getting worse?</h3>
-          <p>
-            The summer-heating notebook already points in this direction: afternoons move a bit,
-            but nights seem to be where the lived discomfort shows up. This should probably be
-            the first proper essay-chart after the homepage.
-          </p>
-        </article>
-        <article class="idea-card">
-          <h3>Which hour of the day carries the season?</h3>
-          <p>
-            The hourly analysis asks a nice question: do we feel summer, winter, and rain most at
-            6am, 2pm, or after dinner? That is more interesting than another monthly average.
-          </p>
-        </article>
-        <article class="idea-card">
-          <h3>Is the rain calendar moving?</h3>
-          <p>
-            The wind/rain work shows two rain peaks and a clean seasonal wind flip. The next
-            useful version is decade by decade: are those peaks arriving earlier, later, or just
-            noisily?
-          </p>
-        </article>
-        <article class="idea-card">
-          <h3>A weird-weather archive</h3>
-          <p>
-            The few-shot workbench has historical examples of hot spells, cool nights, dry runs,
-            rain bursts, and record clusters. Those could become a browsable gallery of Bangalore
-            weather situations.
-          </p>
-        </article>
-        <article class="idea-card">
-          <h3>How much does rain depend on where you stand?</h3>
-          <p>
-            The April 30 rainfall mismatch is still worth explaining in plain English. Bangalore
-            rain is local enough that a city-wide chart can be right and still feel wrong to
-            someone who got drenched.
-          </p>
-        </article>
-        <article class="idea-card">
-          <h3>The October question</h3>
-          <p>
-            Bangalore people often talk about monsoon as if June-September is the whole story.
-            The existing rain charts suggest October deserves its own page.
-          </p>
-        </article>
       </div>
     </div>
   </section>
