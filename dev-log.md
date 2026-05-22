@@ -573,3 +573,22 @@ env R_ENVIRON_USER=/home/karthik/apps/bangalore-weather/.Renviron \
 - Added skip link, reduced-motion handling, monospace code styling, and more specific alt text for analysis charts.
 - Deliberately did not add interactive charts in this pass because the project data-visualization guide says static charts by default unless explicitly requested.
 <!-- codex-session:2026-05-22-site-critique:end -->
+
+<!-- codex-session:2026-05-22-daily-scheduler:start -->
+## 2026-05-22 11:25 UTC | Codex session `daily-scheduler`
+
+### User prompts
+> will this website update itself tomorow? somewehre I saw that dsome datesa are hardcoded etc. make sure this updates daily at maybe 8am IST
+> test evertything properly
+> can you investigate why claude has started failing now in the last 2 days? wiht 429. it never did before
+
+### Work done
+- Added `deploy/bangalore-weather-daily.service` and `deploy/bangalore-weather-daily.timer`; installed them into the user systemd manager and enabled the timer.
+- Confirmed the next automatic run is `02:30 UTC`, i.e. `08:00 IST`, and `loginctl` shows `Linger=yes`, so the timer should survive logout/reboot.
+- Replaced stale hardcoded homepage fallback dates/insights with neutral loading text; live values still come from `docs/latest.json`.
+- Updated `bangalore_weather_update.R` to regenerate `docs/sitemap.xml` daily along with `docs/latest.json`, `docs/feed.xml`, the CSV, and the PNG assets.
+- Tested the actual systemd service path repeatedly, not a separate shell path; verified Caddy serves homepage, latest JSON, PNG, RSS, sitemap, and CSV with `200`.
+- Changed daily commentary so weak local fallback is no longer published. Haiku is retried and validated; the job fails loudly if Claude cannot produce acceptable text.
+- Investigated Claude failures and found external Anthropic incidents around Haiku 4.5 on 20 and 22 May 2026. A live Haiku probe returned `200` with full rate-limit headroom.
+- Documented Haiku-only policy, Claude incident debugging, rate-limit header checks, and manual end-to-end service testing in `docs/DEPLOY.md`.
+<!-- codex-session:2026-05-22-daily-scheduler:end -->

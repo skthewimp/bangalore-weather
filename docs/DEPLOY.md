@@ -122,9 +122,23 @@ This script:
 
    ```text
    docs/latest.json
+   docs/feed.xml
+   docs/sitemap.xml
+   docs/data/bangalore_daily_weather.csv
    ```
 
 The homepage consumes `docs/latest.json` and `docs/assets/latest.png`.
+
+Daily commentary is intentionally LLM-generated. The policy is:
+
+- Use Haiku only: `claude-haiku-4-5-20251001`.
+- Do not fall back to local/template prose if Claude fails. Weak fallback copy is worse than
+  a failed run because it makes the site look fresher than the analysis really is.
+- Retry Claude a few times for transient API or wording-validation failures.
+- If Haiku cannot produce acceptable commentary, let the job fail loudly and inspect it.
+
+The daily update also regenerates the sitemap so `lastmod` does not drift from the actual
+published data.
 
 ### Automatic daily run
 
@@ -163,6 +177,31 @@ systemctl --user status bangalore-weather-daily.timer --no-pager
 journalctl --user -u bangalore-weather-daily.service --since "2 days ago" --no-pager
 ```
 
+Manual end-to-end test:
+
+```bash
+systemctl --user start bangalore-weather-daily.service
+systemctl --user status bangalore-weather-daily.service --no-pager
+journalctl --user -u bangalore-weather-daily.service --since "10 minutes ago" --no-pager
+```
+
+Expected result:
+
+- `status=0/SUCCESS` in systemd.
+- A log line like `Claude commentary accepted on attempt 1`.
+- Fresh mtimes on `docs/latest.json`, `docs/assets/latest.png`, `docs/feed.xml`, and
+  `docs/sitemap.xml`.
+
+Live local Caddy checks:
+
+```bash
+curl -k -I --connect-to weather.karthiks.co:443:127.0.0.1:443 https://weather.karthiks.co/
+curl -k -I --connect-to weather.karthiks.co:443:127.0.0.1:443 https://weather.karthiks.co/latest.json
+curl -k -I --connect-to weather.karthiks.co:443:127.0.0.1:443 https://weather.karthiks.co/assets/latest.png
+curl -k -I --connect-to weather.karthiks.co:443:127.0.0.1:443 https://weather.karthiks.co/feed.xml
+curl -k -I --connect-to weather.karthiks.co:443:127.0.0.1:443 https://weather.karthiks.co/sitemap.xml
+```
+
 The year archive grid is driven by:
 
 ```text
@@ -172,6 +211,51 @@ docs/archive_years.json
 The daily updater checks the current data year. When the data rolls into a new year, it treats
 the previous year as complete, generates the completed-year chart if needed, copies it to
 `docs/assets/analysis/`, and prepends that year to `archive_years.json`.
+
+### Claude failures
+
+If the daily run fails around the Claude step, first decide whether this is our key/quota or
+Anthropic service health.
+
+Check recent service logs:
+
+```bash
+journalctl --user -u bangalore-weather-daily.service --since "2 days ago" --no-pager
+```
+
+Check Anthropic public status:
+
+```bash
+curl -L -sS https://status.anthropic.com/api/v2/status.json
+curl -L -sS https://status.anthropic.com/api/v2/incidents/unresolved.json
+curl -L -sS https://status.anthropic.com/api/v2/incidents.json
+```
+
+As of 22 May 2026, Haiku 4.5 had recent upstream incidents:
+
+- 20 May 2026: `Elevated errors on Claude Haiku 4.5`.
+- 22 May 2026: `Elevated error rate on multiple models`, with updates mentioning remaining
+  Haiku 4.5 errors.
+
+So a sudden burst of `429`, `529`, or transient API failures is not automatically a project
+bug. It can be Anthropic-side instability.
+
+To check the current project key without exposing it, run a tiny Haiku probe and inspect
+headers:
+
+```bash
+Rscript -e 'library(httr2); if (file.exists(".Renviron")) readRenviron(".Renviron"); req <- request("https://api.anthropic.com/v1/messages") |> req_headers(`x-api-key` = Sys.getenv("ANTHROPIC_API_KEY"), `anthropic-version` = "2023-06-01", `content-type` = "application/json") |> req_body_json(list(model = "claude-haiku-4-5-20251001", max_tokens = 1, messages = list(list(role = "user", content = "ping")))) |> req_error(is_error = function(resp) FALSE); resp <- req_perform(req); cat("status=", resp_status(resp), "\n", sep = ""); h <- resp_headers(resp); wanted <- names(h)[grepl("ratelimit|retry-after|request-id", names(h), ignore.case = TRUE)]; for (n in wanted) cat(n, ": ", h[[n]], "\n", sep = "")'
+```
+
+Interpretation:
+
+- `200` with plenty of `anthropic-ratelimit-*-remaining` means the key is fine.
+- `429` with low remaining counts or a `retry-after` means wait; do not hammer manual reruns.
+- `529` usually means provider overload. Wait and rerun later.
+
+Do not switch the daily job to Sonnet just for reliability. It is too expensive for this
+small daily text task. Keep Haiku-only, retry patiently, fail loudly, and try again after the
+incident clears.
 
 ## Secrets
 
