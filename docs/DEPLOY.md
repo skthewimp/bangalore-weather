@@ -126,6 +126,16 @@ This script:
 
 The homepage consumes `docs/latest.json` and `docs/assets/latest.png`.
 
+The year archive grid is driven by:
+
+```text
+docs/archive_years.json
+```
+
+The daily updater checks the current data year. When the data rolls into a new year, it treats
+the previous year as complete, generates the completed-year chart if needed, copies it to
+`docs/assets/analysis/`, and prepends that year to `archive_years.json`.
+
 ## Secrets
 
 The project-local `.Renviron` contains API keys and must never be committed.

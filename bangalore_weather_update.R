@@ -739,5 +739,84 @@ jsonlite::write_json(
   auto_unbox = TRUE,
   pretty = TRUE
 )
+
+archive_summary_from_stats <- function(stats) {
+  rain_ratio <- ifelse(stats$annual_rain_avg > 0, stats$annual_rain_mm / stats$annual_rain_avg, 1)
+  wettest_ratio <- ifelse(stats$wettest_month_avg > 0, stats$wettest_month_mm / stats$wettest_month_avg, 1)
+
+  if (rain_ratio >= 1.2 && wettest_ratio >= 1.8) {
+    return(paste("Wet year,", stats$wettest_month, "surge"))
+  }
+  if (rain_ratio >= 1.2) {
+    return(paste("Wet year, strong", stats$wettest_month))
+  }
+  if (rain_ratio <= 0.85 && stats$longest_dry_spell >= 45) {
+    return(paste("Dry year,", paste0(stats$longest_dry_spell, "-day dry spell")))
+  }
+  if (rain_ratio <= 0.85) {
+    return(paste("Dry year,", stats$wettest_month, "peak"))
+  }
+  if (stats$record_breaking_days >= 25) {
+    return("Many records, near-normal rain")
+  }
+  if (stats$hot_days > stats$hot_days_avg * 1.4) {
+    return(paste("Hot year,", stats$wettest_month, "rain"))
+  }
+  paste("Near normal,", stats$wettest_month, "rain")
+}
+
+publish_completed_year_archive <- function() {
+  completed_year <- curr_year - 1
+  if (completed_year < 2006) return(invisible(FALSE))
+
+  archive_catalog_file <- file.path(docs_dir, "archive_years.json")
+  archive_entries <- if (file.exists(archive_catalog_file)) {
+    jsonlite::read_json(archive_catalog_file, simplifyVector = FALSE)
+  } else {
+    list()
+  }
+
+  archived_years <- archive_entries %>%
+    map_int(~ if (is.null(.x$year)) NA_integer_ else as.integer(.x$year)) %>%
+    purrr::discard(is.na)
+
+  if (completed_year %in% archived_years) return(invisible(FALSE))
+
+  message("Publishing completed-year archive for ", completed_year)
+  source(file.path(script_dir, "bangalore_weather_historical.R"), local = environment())
+
+  annual_chart_name <- paste0("bangalore_weather_", completed_year, ".png")
+  annual_chart <- file.path(script_dir, "charts", annual_chart_name)
+  public_analysis_dir <- file.path(docs_assets_dir, "analysis")
+  public_annual_chart <- file.path(public_analysis_dir, annual_chart_name)
+
+  dir.create(public_analysis_dir, recursive = TRUE, showWarnings = FALSE)
+  if (!file.exists(annual_chart) || !file.exists(public_annual_chart)) {
+    generate_weather_chart(completed_year, save_path = annual_chart)
+  }
+  file.copy(annual_chart, public_annual_chart, overwrite = TRUE)
+
+  archive_entry <- list(
+    year = completed_year,
+    href = file.path("assets", "analysis", annual_chart_name),
+    summary = archive_summary_from_stats(compute_weather_stats(blrTemp, blrRain, completed_year))
+  )
+
+  archive_entries <- c(list(archive_entry), archive_entries) %>%
+    purrr::keep(~ !is.null(.x$year)) %>%
+    split(map_chr(., ~ as.character(.x$year))) %>%
+    map(~ .x[[1]]) %>%
+    .[order(as.integer(names(.)), decreasing = TRUE)]
+
+  jsonlite::write_json(
+    unname(archive_entries),
+    archive_catalog_file,
+    auto_unbox = TRUE,
+    pretty = TRUE
+  )
+  invisible(TRUE)
+}
+
+publish_completed_year_archive()
 message("Published docs assets: ", latest_file, " and ", file.path(docs_dir, "latest.json"))
 combined

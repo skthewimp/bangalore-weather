@@ -545,3 +545,16 @@ env R_ENVIRON_USER=/home/karthik/apps/bangalore-weather/.Renviron \
   Rscript bangalore_weather_historical.R 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020
 ```
 <!-- codex-session:2026-05-22-historical-archive:end -->
+
+<!-- codex-session:2026-05-22-year-rollover:start -->
+## 2026-05-22 10:20 UTC | Codex session `year-rollover`
+
+### User prompt
+> the title should say 2027 next year. also when it becomes 2027, then 2026 needs to be added to the archive charts etc.
+
+### Work done
+- Confirmed the daily title already uses the latest data year, so once the data has 2027 rows `latest.json` will publish `Bangalore's Weather in 2027`.
+- Added `docs/archive_years.json` as the source for the homepage archive grid, while keeping the static HTML archive as a no-JS fallback.
+- Updated `bangalore_weather_update.R` so the daily run detects year rollover, generates the completed previous year's annual chart if missing, copies it into `docs/assets/analysis/`, and prepends the year to `archive_years.json`.
+- Documented the rollover behavior in `docs/DEPLOY.md`.
+<!-- codex-session:2026-05-22-year-rollover:end -->

@@ -1,0 +1,102 @@
+[
+  {
+    "year": 2025,
+    "href": "assets/analysis/bangalore_weather_2025.png",
+    "summary": "May rain, long dry run"
+  },
+  {
+    "year": 2024,
+    "href": "assets/analysis/bangalore_weather_2024.png",
+    "summary": "Record heat, wet August"
+  },
+  {
+    "year": 2023,
+    "href": "assets/analysis/bangalore_weather_2023.png",
+    "summary": "Dry year, many records"
+  },
+  {
+    "year": 2022,
+    "href": "assets/analysis/bangalore_weather_2022.png",
+    "summary": "Wet year, strong July"
+  },
+  {
+    "year": 2021,
+    "href": "assets/analysis/bangalore_weather_2021.png",
+    "summary": "Very wet, November surge"
+  },
+  {
+    "year": 2020,
+    "href": "assets/analysis/bangalore_weather_2020.png",
+    "summary": "Wet monsoon, steady rain"
+  },
+  {
+    "year": 2019,
+    "href": "assets/analysis/bangalore_weather_2019.png",
+    "summary": "Wet October, above normal"
+  },
+  {
+    "year": 2018,
+    "href": "assets/analysis/bangalore_weather_2018.png",
+    "summary": "May rain, weak monsoon"
+  },
+  {
+    "year": 2017,
+    "href": "assets/analysis/bangalore_weather_2017.png",
+    "summary": "September-heavy, near normal"
+  },
+  {
+    "year": 2016,
+    "href": "assets/analysis/bangalore_weather_2016.png",
+    "summary": "Hot year, June rain"
+  },
+  {
+    "year": 2015,
+    "href": "assets/analysis/bangalore_weather_2015.png",
+    "summary": "Very wet, November flood"
+  },
+  {
+    "year": 2014,
+    "href": "assets/analysis/bangalore_weather_2014.png",
+    "summary": "Record heat, modest rain"
+  },
+  {
+    "year": 2013,
+    "href": "assets/analysis/bangalore_weather_2013.png",
+    "summary": "September rain, hot days"
+  },
+  {
+    "year": 2012,
+    "href": "assets/analysis/bangalore_weather_2012.png",
+    "summary": "Dry year, 60-day dry spell"
+  },
+  {
+    "year": 2011,
+    "href": "assets/analysis/bangalore_weather_2011.png",
+    "summary": "Wet year, no hot days"
+  },
+  {
+    "year": 2010,
+    "href": "assets/analysis/bangalore_weather_2010.png",
+    "summary": "Wet year, big July"
+  },
+  {
+    "year": 2009,
+    "href": "assets/analysis/bangalore_weather_2009.png",
+    "summary": "Wet September, hot year"
+  },
+  {
+    "year": 2008,
+    "href": "assets/analysis/bangalore_weather_2008.png",
+    "summary": "Wet year, August peak"
+  },
+  {
+    "year": 2007,
+    "href": "assets/analysis/bangalore_weather_2007.png",
+    "summary": "Wet year, rainy August"
+  },
+  {
+    "year": 2006,
+    "href": "assets/analysis/bangalore_weather_2006.png",
+    "summary": "Dry year, long dry spell"
+  }
+]

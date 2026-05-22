@@ -559,7 +559,7 @@ h2 {
           stable, 2006, 2016, or 2025 can be read against the same normals and records.
         </p>
       </div>
-      <div class="year-grid" aria-label="Historical Bangalore weather charts">
+      <div class="year-grid" id="archive-years" aria-label="Historical Bangalore weather charts">
         <a class="year-link" href="assets/analysis/bangalore_weather_2025.png">2025<span>May rain, long dry run</span></a>
         <a class="year-link" href="assets/analysis/bangalore_weather_2024.png">2024<span>Record heat, wet August</span></a>
         <a class="year-link" href="assets/analysis/bangalore_weather_2023.png">2023<span>Dry year, many records</span></a>
@@ -686,6 +686,24 @@ function renderInsights(items) {
   });
 }
 
+function renderArchiveYears(items) {
+  if (!Array.isArray(items) || items.length === 0) return;
+  const target = document.getElementById("archive-years");
+  if (!target) return;
+  target.innerHTML = "";
+  items.forEach((item) => {
+    if (!item || !item.year || !item.href) return;
+    const link = document.createElement("a");
+    const label = document.createElement("span");
+    link.className = "year-link";
+    link.href = item.href;
+    link.textContent = item.year;
+    label.textContent = item.summary || "Year chart";
+    link.appendChild(label);
+    target.appendChild(link);
+  });
+}
+
 async function loadLatest() {
   try {
     const response = await fetch("latest.json", { cache: "no-store" });
@@ -704,7 +722,18 @@ async function loadLatest() {
   }
 }
 
+async function loadArchiveYears() {
+  try {
+    const response = await fetch("archive_years.json", { cache: "no-store" });
+    if (!response.ok) return;
+    renderArchiveYears(await response.json());
+  } catch (error) {
+    // Static archive links above are the fallback.
+  }
+}
+
 loadLatest();
+loadArchiveYears();
 </script>
 </body>
 </html>
