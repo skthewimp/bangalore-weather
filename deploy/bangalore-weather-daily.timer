@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Bangalore Weather update daily at 08:00 IST
+
+[Timer]
+# Server timezone is UTC. 02:30 UTC is 08:00 in Asia/Kolkata.
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+Unit=bangalore-weather-daily.service
+
+[Install]
+WantedBy=timers.target

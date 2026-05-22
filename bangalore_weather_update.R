@@ -780,6 +780,32 @@ feed_xml <- paste0(
 )
 writeLines(feed_xml, file.path(docs_dir, "feed.xml"))
 
+sitemap_lastmod <- as.character(Sys.Date())
+sitemap_xml <- paste0(
+  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+  "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
+  "  <url>\n",
+  "    <loc>https://weather.karthiks.co/</loc>\n",
+  "    <lastmod>", sitemap_lastmod, "</lastmod>\n",
+  "    <changefreq>daily</changefreq>\n",
+  "    <priority>1.0</priority>\n",
+  "  </url>\n",
+  "  <url>\n",
+  "    <loc>https://weather.karthiks.co/latest.json</loc>\n",
+  "    <lastmod>", sitemap_lastmod, "</lastmod>\n",
+  "    <changefreq>daily</changefreq>\n",
+  "    <priority>0.8</priority>\n",
+  "  </url>\n",
+  "  <url>\n",
+  "    <loc>https://weather.karthiks.co/feed.xml</loc>\n",
+  "    <lastmod>", sitemap_lastmod, "</lastmod>\n",
+  "    <changefreq>daily</changefreq>\n",
+  "    <priority>0.5</priority>\n",
+  "  </url>\n",
+  "</urlset>\n"
+)
+writeLines(sitemap_xml, file.path(docs_dir, "sitemap.xml"))
+
 archive_summary_from_stats <- function(stats) {
   rain_ratio <- ifelse(stats$annual_rain_avg > 0, stats$annual_rain_mm / stats$annual_rain_avg, 1)
   wettest_ratio <- ifelse(stats$wettest_month_avg > 0, stats$wettest_month_mm / stats$wettest_month_avg, 1)

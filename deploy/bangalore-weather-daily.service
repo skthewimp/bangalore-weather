@@ -1,0 +1,8 @@
+[Unit]
+Description=Update the Bangalore Weather static site
+Documentation=file:/home/karthik/apps/bangalore-weather/docs/DEPLOY.md
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/karthik/apps/bangalore-weather
+ExecStart=/home/karthik/apps/bangalore-weather/run_daily_weather.sh

@@ -126,6 +126,43 @@ This script:
 
 The homepage consumes `docs/latest.json` and `docs/assets/latest.png`.
 
+### Automatic daily run
+
+The intended production scheduler is a user-level systemd timer:
+
+```text
+deploy/bangalore-weather-daily.service
+deploy/bangalore-weather-daily.timer
+```
+
+It runs `./run_daily_weather.sh` every day at 02:30 UTC, which is 08:00 IST.
+`Persistent=true` means that if the machine is asleep or rebooting at 08:00 IST, systemd
+will run the missed update when the user manager comes back.
+
+Install or refresh the timer with:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp deploy/bangalore-weather-daily.service ~/.config/systemd/user/
+cp deploy/bangalore-weather-daily.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now bangalore-weather-daily.timer
+systemctl --user list-timers --all | grep bangalore-weather
+```
+
+For this to survive logout and reboot, linger should be enabled once:
+
+```bash
+sudo loginctl enable-linger karthik
+```
+
+Useful checks:
+
+```bash
+systemctl --user status bangalore-weather-daily.timer --no-pager
+journalctl --user -u bangalore-weather-daily.service --since "2 days ago" --no-pager
+```
+
 The year archive grid is driven by:
 
 ```text
