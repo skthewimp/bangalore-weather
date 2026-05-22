@@ -610,7 +610,7 @@ chart_date_text <- if (identical(temp_end_date, rain_end_date)) {
   )
 }
 
-commentary <- tryCatch({
+request_claude_commentary <- function(retry_note = NULL) {
   body <- list(
     model = "claude-haiku-4-5-20251001",
     max_tokens = 200,
@@ -636,9 +636,21 @@ commentary <- tryCatch({
     ),
     messages = c(
       few_shot_messages,
-      list(list(role = "user", content = paste0("Bangalore weather stats:\n", recent_facts)))
+      list(list(
+        role = "user",
+        content = paste0(
+          "Bangalore weather stats:\n",
+          recent_facts,
+          if (!is.null(retry_note) && nzchar(retry_note)) {
+            paste0("\n\nRETRY NOTE\n", retry_note)
+          } else {
+            ""
+          }
+        )
+      ))
     )
   )
+
   resp <- request("https://api.anthropic.com/v1/messages") %>%
     req_headers(
       `x-api-key` = Sys.getenv("ANTHROPIC_API_KEY"),
@@ -648,34 +660,73 @@ commentary <- tryCatch({
     req_body_json(body) %>%
     req_timeout(30) %>%
     perform_claude_request_with_retries()
+
   if (resp_status(resp) != 200) {
-    message("Claude API returned status ", resp_status(resp), ". Using fallback commentary.")
-    live_context$fallback_commentary
-  } else {
-    raw <- resp %>% resp_body_json() %>% .$content %>% .[[1]] %>% .$text
-    lines <- strsplit(raw, "\n")[[1]]
-    bullet_lines <- lines[grepl("^\u2022", trimws(lines))]
-    if (length(bullet_lines) == 0) NULL
-    else {
-      candidate <- normalize_commentary_text(paste(trimws(bullet_lines), collapse = "\n"))
-      if (has_ambiguous_window_text(candidate)) {
-        message("Claude commentary used ambiguous window wording. Skipping commentary.")
-        live_context$fallback_commentary
-      } else if (has_overstated_weather_text(candidate)) {
-        message("Claude commentary used overstated or inferred climate wording. Skipping commentary.")
-        live_context$fallback_commentary
-      } else if (has_muddled_subtitle_text(candidate)) {
-        message("Claude commentary used muddled subtitle wording. Skipping commentary.")
-        live_context$fallback_commentary
-      } else {
-        candidate
+    stop("Claude API returned status ", resp_status(resp), ".")
+  }
+
+  raw <- resp %>% resp_body_json() %>% .$content %>% .[[1]] %>% .$text
+  lines <- strsplit(raw, "\n")[[1]]
+  bullet_lines <- lines[grepl("^\u2022", trimws(lines))]
+  if (length(bullet_lines) == 0) {
+    stop("Claude returned no bullet lines. Raw response: ", raw)
+  }
+
+  candidate <- normalize_commentary_text(paste(trimws(bullet_lines), collapse = "\n"))
+  validation_failures <- c(
+    if (has_ambiguous_window_text(candidate)) "ambiguous window wording" else NULL,
+    if (has_overstated_weather_text(candidate)) "overstated or inferred climate wording" else NULL,
+    if (has_muddled_subtitle_text(candidate)) "muddled subtitle wording" else NULL
+  )
+
+  if (length(validation_failures) > 0) {
+    stop(
+      "Claude commentary failed validation: ",
+      paste(validation_failures, collapse = ", "),
+      ". Candidate: ",
+      candidate
+    )
+  }
+
+  candidate
+}
+
+commentary <- {
+  last_error <- NULL
+  accepted <- NULL
+
+  for (attempt in seq_len(3)) {
+    retry_note <- if (attempt == 1 || is.null(last_error)) {
+      NULL
+    } else {
+      paste0(
+        "The previous attempt was rejected because: ",
+        last_error,
+        "\nRewrite from the same facts. Keep exactly three short bullets. Avoid the rejected wording."
+      )
+    }
+
+    accepted <- tryCatch(
+      request_claude_commentary(retry_note),
+      error = function(e) {
+        last_error <<- e$message
+        message("Claude commentary attempt ", attempt, " failed: ", e$message)
+        NULL
       }
+    )
+
+    if (!is.null(accepted) && nzchar(accepted)) {
+      message("Claude commentary accepted on attempt ", attempt, ".")
+      break
     }
   }
-}, error = function(e) {
-  message("Claude API call failed: ", e$message, ". Using fallback commentary.")
-  live_context$fallback_commentary
-})
+
+  if (is.null(accepted) || !nzchar(accepted)) {
+    stop("Claude commentary failed after 3 attempts. Last error: ", last_error)
+  }
+
+  accepted
+}
 
 
 temp_data <- build_temperature_plot_data(blrTemp, curr_year)
@@ -776,7 +827,7 @@ feed_xml <- paste0(
   "    <description>Daily Bangalore weather chart updates.</description>\n",
   feed_items,
   "  </channel>\n",
-  "</rss>\n"
+  "</rss>"
 )
 writeLines(feed_xml, file.path(docs_dir, "feed.xml"))
 
@@ -802,7 +853,19 @@ sitemap_xml <- paste0(
   "    <changefreq>daily</changefreq>\n",
   "    <priority>0.5</priority>\n",
   "  </url>\n",
-  "</urlset>\n"
+  "  <url>\n",
+  "    <loc>https://weather.karthiks.co/archive_years.json</loc>\n",
+  "    <lastmod>", sitemap_lastmod, "</lastmod>\n",
+  "    <changefreq>yearly</changefreq>\n",
+  "    <priority>0.4</priority>\n",
+  "  </url>\n",
+  "  <url>\n",
+  "    <loc>https://weather.karthiks.co/data/bangalore_daily_weather.csv</loc>\n",
+  "    <lastmod>", sitemap_lastmod, "</lastmod>\n",
+  "    <changefreq>daily</changefreq>\n",
+  "    <priority>0.6</priority>\n",
+  "  </url>\n",
+  "</urlset>"
 )
 writeLines(sitemap_xml, file.path(docs_dir, "sitemap.xml"))
 
