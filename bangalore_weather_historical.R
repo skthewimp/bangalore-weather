@@ -165,14 +165,22 @@ compute_weather_stats <- function(blrTemp, blrRain, target_year) {
   )
 }
 
+normalize_commentary_text <- function(text) {
+  if (is.null(text) || !nzchar(text)) return(text)
+  text %>%
+    str_replace_all("\u2022", "*") %>%
+    str_replace_all("\u2013|\u2014|\u2212", "-") %>%
+    str_replace_all("[\u2018\u2019]", "'") %>%
+    str_replace_all("[\u201C\u201D]", "\"")
+}
+
+safe_dev <- function(actual, avg) {
+  if (is.null(actual) || is.null(avg) || is.na(actual) || is.na(avg) || avg == 0) return(0)
+  abs(actual - avg) / abs(avg)
+}
+
 generate_commentary <- function(stats) {
-
   # R pre-ranks facts by how far they deviate from average
-  safe_dev <- function(actual, avg) {
-    if (is.null(avg) || is.na(avg) || avg == 0) return(0)
-    abs(actual - avg) / abs(avg)
-  }
-
   facts <- list(
     list(dev = safe_dev(stats$hot_days, stats$hot_days_avg),
          text = paste0(stats$hot_days, " days above ", stats$hot_day_thresh, "\u00B0C vs the usual ", stats$hot_days_avg)),
@@ -205,8 +213,7 @@ generate_commentary <- function(stats) {
   top_idx <- order(devs, decreasing = TRUE)[1:5]
   top_facts <- paste(sapply(facts[top_idx], function(f) f$text), collapse = "\n")
 
-  body <- list(
-    model = "claude-haiku-4-5-20251001",
+  base_body <- list(
     max_tokens = 300,
     system = paste0(
       "You are writing a terse chart subtitle for a Bangalore weather visualization for the year ", stats$year, ". ",
@@ -214,6 +221,7 @@ generate_commentary <- function(stats) {
       "Write exactly 4 bullets that a Bangalore resident would find interesting. ",
       "Focus on what stands out - comparisons to normal, streaks, records. Not just restating numbers. ",
       "Each bullet must be under 15 words, start with '\u2022 ', and use \u00B0C. ",
+      "Write like an observant Bangalore resident, not a lab report. ",
       "Plain, calm tone. No hyperbole. Output only the 4 bullets, nothing else."
     ),
     messages = list(
@@ -221,33 +229,74 @@ generate_commentary <- function(stats) {
     )
   )
 
-  resp <- tryCatch({
-    request("https://api.anthropic.com/v1/messages") %>%
-      req_headers(
-        `x-api-key` = Sys.getenv("ANTHROPIC_API_KEY"),
-        `anthropic-version` = "2023-06-01",
-        `content-type` = "application/json"
-      ) %>%
-      req_body_json(body) %>%
-      req_timeout(30) %>%
-      perform_claude_request_with_retries()
-  }, error = function(e) {
-    message("Claude API call failed: ", e$message, ". Skipping commentary.")
-    return(NULL)
-  })
+  max_attempts <- as.integer(Sys.getenv("HISTORICAL_COMMENTARY_MAX_ATTEMPTS", "6"))
+  if (is.na(max_attempts) || max_attempts < 1) max_attempts <- 1
+  initial_sleep <- as.numeric(Sys.getenv("HISTORICAL_COMMENTARY_INITIAL_SLEEP", "8"))
+  if (is.na(initial_sleep) || initial_sleep < 1) initial_sleep <- 1
+  model_names <- strsplit(
+    Sys.getenv(
+      "HISTORICAL_COMMENTARY_MODELS",
+      "claude-haiku-4-5-20251001,claude-sonnet-4-5-20250929"
+    ),
+    ","
+  )[[1]] %>%
+    trimws() %>%
+    discard(~ !nzchar(.x))
 
-  if (is.null(resp)) return(NULL)
+  if (length(model_names) == 0) {
+    stop("No Claude models configured for historical commentary.", call. = FALSE)
+  }
+
+  resp <- NULL
+  last_status <- NULL
+  last_error <- NULL
+
+  for (model_name in model_names) {
+    body <- c(list(model = model_name), base_body)
+    message("Generating ", stats$year, " commentary with ", model_name)
+
+    resp <- tryCatch({
+      request("https://api.anthropic.com/v1/messages") %>%
+        req_headers(
+          `x-api-key` = Sys.getenv("ANTHROPIC_API_KEY"),
+          `anthropic-version` = "2023-06-01",
+          `content-type` = "application/json"
+        ) %>%
+        req_body_json(body) %>%
+        req_timeout(30) %>%
+        perform_claude_request_with_retries(max_attempts = max_attempts, initial_sleep = initial_sleep)
+    }, error = function(e) {
+      last_error <<- e$message
+      return(NULL)
+    })
+
+    if (is.null(resp)) next
+
+    last_status <- resp_status(resp)
+    if (last_status == 200) break
+
+    message("Claude model ", model_name, " returned status ", last_status, ". Trying next model if available.")
+    resp <- NULL
+  }
+
+  if (is.null(resp)) {
+    if (!is.null(last_error)) {
+      stop("Claude API call failed for ", stats$year, ": ", last_error, call. = FALSE)
+    }
+    stop("Claude API returned no successful response for ", stats$year, call. = FALSE)
+  }
 
   if (resp_status(resp) != 200) {
-    message("Claude API returned status ", resp_status(resp), ". Skipping commentary.")
-    return(NULL)
+    stop("Claude API returned status ", resp_status(resp), " for ", stats$year, call. = FALSE)
   }
 
   raw <- resp %>% resp_body_json() %>% .$content %>% .[[1]] %>% .$text
   lines <- strsplit(raw, "\n")[[1]]
   bullet_lines <- lines[grepl("^\u2022", trimws(lines))]
-  if (length(bullet_lines) == 0) return(NULL)
-  paste(trimws(bullet_lines), collapse = "\n")
+  if (length(bullet_lines) == 0) {
+    stop("Claude returned no bullet commentary for ", stats$year, call. = FALSE)
+  }
+  normalize_commentary_text(paste(trimws(bullet_lines), collapse = "\n"))
 }
 
 generate_weather_chart <- function(target_year, save_path = NULL, width = 13.5, height = 7.5, commentary = NULL) {
@@ -300,5 +349,7 @@ if (length(args) > 0) {
   for (yr in years) {
     outfile <- file.path(.script_dir, 'charts', paste0('bangalore_weather_', yr, '.png'))
     generate_weather_chart(yr, save_path = outfile)
+    delay <- as.numeric(Sys.getenv("HISTORICAL_COMMENTARY_YEAR_DELAY", "12"))
+    if (!is.na(delay) && delay > 0) Sys.sleep(delay)
   }
 }

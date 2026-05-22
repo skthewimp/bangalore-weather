@@ -518,3 +518,30 @@ Same fix line 226, 24…
 - Ran the repair pass within quota, replacing historical `gfs` rows in `data/bangaloreRainfall.RData` and `data/bangaloreTemperature.RData`; after the repair both files are fully `era5`, while `data/bangaloreWind.RData` keeps only the expected recent `gfs` tail.
 - Verified the corrected saved data now shows `2026-04-30` rainfall of about `8.85 mm` at the project coordinate instead of the stale low value from the pre-repair dataset.
 <!-- codex-session:2026-05-16-oikolab-era5-repair:end -->
+
+<!-- codex-session:2026-05-22-historical-archive:start -->
+## 2026-05-22 06:56 UTC | Codex session `historical-archive`
+
+### User prompts
+> the historical charts noeed to go back 20 years. not 5.genrate chartes for those earlier years as well., and in the homepage, like you've put a half-sentence summary for 2025, put for other yeras as well. 2006 onwards.
+> no - run it wiht commentary. else no point
+> maybe you should see why it faileed? the hitorical script hasn' b een updated in a while. make sure it matches current script et c.
+> Don't fall back. It's very, very weak. Make sure that the LLM does the generation and stuff.
+
+### Work done
+- Updated `bangalore_weather_historical.R` so historical commentary is mandatory LLM output, not a silent local fallback.
+- Added configurable Claude model failover through `HISTORICAL_COMMENTARY_MODELS`; Haiku repeatedly returned 529 during this session, so the successful backfill used Sonnet for the older years.
+- Regenerated `charts/bangalore_weather_2006.png` through `charts/bangalore_weather_2020.png` with LLM-generated commentary and copied them to `docs/assets/analysis/`.
+- Expanded the homepage archive grid in `docs/index.html` to cover every year from 2006 through 2025, with short data-based summaries for each year.
+- Verified the public homepage copy still avoids the removed technical source story and has no em dashes or placeholder `href="#"` links.
+
+### Useful commands
+```bash
+env R_ENVIRON_USER=/home/karthik/apps/bangalore-weather/.Renviron \
+  HISTORICAL_COMMENTARY_MODELS=claude-sonnet-4-5-20250929 \
+  HISTORICAL_COMMENTARY_MAX_ATTEMPTS=6 \
+  HISTORICAL_COMMENTARY_INITIAL_SLEEP=8 \
+  HISTORICAL_COMMENTARY_YEAR_DELAY=12 \
+  Rscript bangalore_weather_historical.R 2006 2007 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019 2020
+```
+<!-- codex-session:2026-05-22-historical-archive:end -->
