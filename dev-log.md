@@ -40,6 +40,13 @@ sudo systemctl reload caddy
 ```
 
 - Added a detailed deployment/runbook at `docs/DEPLOY.md`, including DNS checks, Caddy welcome-page recovery, HTTPS debugging, daily publishing, request-box setup, and secret handling.
+- Follow-up homepage copy pass: removed the public-facing ERA5/Oikolab/NOAA source explainer because it was too technical for the site. Replaced it with a plain-English data caveat and added a "What should go up next" section with website-worthy analysis ideas already suggested by repo work:
+  - summer nights getting worse
+  - hour-of-day seasonality
+  - rain calendar / monsoon timing drift
+  - weird-weather archive from few-shot examples
+  - neighbourhood-scale rainfall mismatch
+  - October as its own rain story
 
 ## Session — 2026-05-16 — Tufte-style weather chart redesign
 
