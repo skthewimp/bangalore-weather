@@ -273,11 +273,23 @@ h2 {
 
 .request-panel {
   display: grid;
-  grid-template-columns: minmax(0, 0.62fr) minmax(220px, 0.38fr);
+  grid-template-columns: minmax(260px, 0.42fr) minmax(420px, 0.58fr);
   gap: 32px;
   align-items: start;
   border-top: 4px solid var(--teal);
   padding-top: 22px;
+}
+
+.request-panel h2 {
+  max-width: 560px;
+}
+
+.request-panel .copy {
+  max-width: 560px;
+}
+
+.request-form {
+  min-width: 0;
 }
 
 .button {
@@ -302,9 +314,13 @@ h2 {
 
 .request-frame {
   width: 100%;
-  min-height: 560px;
+  height: 520px;
   border: 1px solid var(--line);
   background: white;
+}
+
+.request-form .button {
+  margin-top: 12px;
 }
 
 .note {
@@ -398,6 +414,10 @@ h2 {
 
   .year-grid {
     grid-template-columns: 1fr;
+  }
+
+  .request-frame {
+    height: 520px;
   }
 }
 </style>
@@ -578,7 +598,7 @@ h2 {
             </p>
           </div>
         </div>
-        <div>
+        <div class="request-form">
           <iframe
             class="request-frame"
             src="https://docs.google.com/forms/d/e/1FAIpQLScWCjU1pV_8Hvv-Tj518yIeJNGA3mvLtjYQrkTNLyiarjIBCg/viewform?embedded=true"
