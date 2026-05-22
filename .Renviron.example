@@ -1,0 +1,3 @@
+OIKOLAB_PRIMARY=your_oikolab_primary_key
+OIKOLAB_SECONDARY=your_oikolab_secondary_key_optional
+ANTHROPIC_API_KEY=your_anthropic_key_optional

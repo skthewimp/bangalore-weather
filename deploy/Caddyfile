@@ -1,0 +1,21 @@
+:80 {
+	root * /usr/share/caddy
+	file_server
+}
+
+weather.karthiks.co {
+	root * /home/karthik/apps/bangalore-weather/docs
+	file_server
+}
+
+claw.karthiks.co {
+	respond "claw app coming soon"
+}
+
+hermes.karthiks.co {
+	respond "hermes app coming soon"
+}
+
+demo.karthiks.co {
+	reverse_proxy localhost:5000
+}

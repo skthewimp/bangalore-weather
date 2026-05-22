@@ -499,7 +499,7 @@ render_weather_chart <- function(temp_data,
       title = title,
       subtitle = subtitle,
       caption = caption
-    ) &
+    ) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(
         family = "serif", face = "bold", size = 20, color = weather_palette$text, hjust = 0

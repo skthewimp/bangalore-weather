@@ -1,6 +1,5 @@
 library(tidytable)
 library(tidyverse)
-library(shadowtext)
 library(ggtext)
 library(yaml)
 library(rvest)
@@ -27,6 +26,16 @@ source(file.path(script_dir, "weather_chart_common.R"))
 
 primKey <- Sys.getenv("OIKOLAB_PRIMARY")
 secKey <- Sys.getenv("OIKOLAB_SECONDARY")
+if (!nzchar(primKey) && nzchar(secKey)) {
+  message("OIKOLAB_PRIMARY not found; using OIKOLAB_SECONDARY.")
+  primKey <- secKey
+}
+if (!nzchar(primKey)) {
+  stop(
+    "OIKOLAB_PRIMARY is required to fetch daily weather data. ",
+    "Create .Renviron from .Renviron.example or export OIKOLAB_PRIMARY before running."
+  )
+}
 load(file.path(script_dir, 'data', 'bangaloreRainfall.RData'))
 load(file.path(script_dir, 'data', 'bangaloreTemperature.RData'))
 load(file.path(script_dir, 'data', 'bangaloreWind.RData'))
@@ -142,6 +151,7 @@ repair_month_starts <- function(df, cutoff_date) {
 }
 
 repair_month_windows <- function(month_starts) {
+  month_starts <- as.Date(month_starts, origin = "1970-01-01")
   tibble(
     start_dt = as.POSIXct(month_starts, tz = tz_local),
     end_dt = as.POSIXct(month_starts %m+% months(1), tz = tz_local)
@@ -584,7 +594,7 @@ has_muddled_subtitle_text <- function(text) {
 recent_window <- 14
 temp_end_date <- max(temp_daily$DT[temp_daily$DT < Sys.Date()])
 rain_end_date <- max(rain_daily$DT[rain_daily$DT < Sys.Date()])
-available_daily_dates <- intersect(temp_daily$DT, rain_daily$DT)
+available_daily_dates <- as.Date(intersect(temp_daily$DT, rain_daily$DT), origin = "1970-01-01")
 live_end_date <- max(available_daily_dates[available_daily_dates < Sys.Date()])
 live_start_date <- live_end_date - (recent_window - 1)
 live_context <- build_weather_window_text(live_start_date, live_end_date, temp_daily, rain_daily)
@@ -639,8 +649,8 @@ commentary <- tryCatch({
     req_timeout(30) %>%
     perform_claude_request_with_retries()
   if (resp_status(resp) != 200) {
-    message("Claude API returned status ", resp_status(resp), ". Skipping commentary.")
-    NULL
+    message("Claude API returned status ", resp_status(resp), ". Using fallback commentary.")
+    live_context$fallback_commentary
   } else {
     raw <- resp %>% resp_body_json() %>% .$content %>% .[[1]] %>% .$text
     lines <- strsplit(raw, "\n")[[1]]
@@ -662,7 +672,10 @@ commentary <- tryCatch({
       }
     }
   }
-}, error = function(e) { message("Claude API call failed: ", e$message); NULL })
+}, error = function(e) {
+  message("Claude API call failed: ", e$message, ". Using fallback commentary.")
+  live_context$fallback_commentary
+})
 
 
 temp_data <- build_temperature_plot_data(blrTemp, curr_year)
@@ -680,4 +693,51 @@ combined <- render_weather_chart(
 outfile <- file.path(script_dir, 'charts', paste0('bangalore_weather_', format(Sys.Date(), '%Y%m%d'), '.png'))
 ggsave(outfile, combined, width = 13.5, height = 7.5)
 message("Saved: ", outfile)
+
+docs_dir <- file.path(script_dir, "docs")
+docs_assets_dir <- file.path(docs_dir, "assets")
+docs_archive_dir <- file.path(docs_dir, "archive")
+dir.create(docs_assets_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(docs_archive_dir, recursive = TRUE, showWarnings = FALSE)
+
+archive_name <- basename(outfile)
+archive_web_path <- file.path("archive", archive_name)
+latest_web_path <- file.path("assets", "latest.png")
+archive_file <- file.path(docs_archive_dir, archive_name)
+latest_file <- file.path(docs_assets_dir, "latest.png")
+
+file.copy(outfile, archive_file, overwrite = TRUE)
+file.copy(outfile, latest_file, overwrite = TRUE)
+
+commentary_lines <- if (!is.null(commentary) && nzchar(commentary)) {
+  commentary %>%
+    strsplit("\n") %>%
+    .[[1]] %>%
+    str_replace("^\\*\\s*", "") %>%
+    str_trim() %>%
+    discard(~ !nzchar(.x))
+} else {
+  character()
+}
+
+latest_payload <- list(
+  title = paste0("Bangalore's Weather in ", curr_year),
+  as_of = as.character(live_end_date),
+  generated_on = as.character(Sys.Date()),
+  chart_date_text = chart_date_text,
+  recent_window_days = recent_window,
+  insights = commentary_lines,
+  image = latest_web_path,
+  archive_image = archive_web_path,
+  source = "Oikolab",
+  repository = "https://github.com/skthewimp/bangalore-weather"
+)
+
+jsonlite::write_json(
+  latest_payload,
+  file.path(docs_dir, "latest.json"),
+  auto_unbox = TRUE,
+  pretty = TRUE
+)
+message("Published docs assets: ", latest_file, " and ", file.path(docs_dir, "latest.json"))
 combined

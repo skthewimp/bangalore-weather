@@ -1,6 +1,5 @@
 require(tidytable)
 require(tidyverse)
-require(shadowtext)
 require(ggtext)
 require(lubridate)
 require(httr2)
