@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bangalore Weather - daily charts since 1981</title>
+<title>Bangalore Weather</title>
 <meta name="description" content="Daily Bangalore weather charts and analysis using hourly temperature, rainfall, and wind data from 1981 onward.">
 <meta name="author" content="Karthik">
 <meta name="theme-color" content="#e5e1d8">
@@ -208,30 +208,6 @@ h1 {
   white-space: nowrap;
 }
 
-.status-dot {
-  display: inline-block;
-  width: 0.65em;
-  height: 0.65em;
-  margin-right: 0.42em;
-  border-radius: 999px;
-  background: var(--teal);
-}
-
-.status-dot[data-status="stale"] {
-  background: #b07a00;
-}
-
-.status-dot[data-status="old"] {
-  background: #9b1c1c;
-}
-
-.chart-orientation {
-  margin: 20px 0 0;
-  max-width: 760px;
-  color: var(--ink);
-  font-weight: 800;
-}
-
 .hero-chart {
   margin-top: 26px;
   background: var(--weather-bg);
@@ -242,14 +218,6 @@ h1 {
 
 .hero-chart img {
   width: 100%;
-}
-
-.hero-actions {
-  margin-top: 12px;
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  font-size: 0.93rem;
 }
 
 .insights {
@@ -552,30 +520,24 @@ h2 {
   <div class="hero-inner">
     <p class="kicker">Updated daily, when the data cooperates</p>
     <h1 id="hero-title">Bangalore's weather, one year at a time.</h1>
+    <p class="lede">
+      I got tired of arguing from memory about whether April used to be nicer, whether May rain
+      actually cools the city, and whether October is secretly the wettest month. So this is the
+      chart I keep around.
+    </p>
     <div class="hero-meta" aria-label="Latest update details">
-      <span><span class="status-dot" aria-hidden="true"></span><span id="as-of">As of 21 May 2026</span></span>
+      <span id="as-of">As of 21 May 2026</span>
       <span id="generated-on">Generated on 22 May 2026</span>
       <span>Hourly archive, daily refresh</span>
     </div>
-    <p class="chart-orientation">What you're looking at: the current year's weather to date against Bangalore's usual range and records since 1981.</p>
     <div class="hero-chart">
       <img id="latest-chart" src="assets/latest.png" width="4050" height="2250" alt="Latest Bangalore weather chart showing daily temperature ranges and cumulative rainfall.">
-    </div>
-    <div class="hero-actions">
-      <a href="assets/latest.png">Download latest PNG</a>
-      <a href="data/bangalore_daily_weather.csv">Download daily CSV</a>
-      <a href="feed.xml">RSS feed</a>
     </div>
     <div class="insights" id="insights" aria-label="Latest weather notes">
       <div class="insight">May 17 hit 36.7°C, the hottest day on record since 1981</div>
       <div class="insight">May is still almost dry at 17.3mm versus 78mm expected through May 21</div>
       <div class="insight">Warm nights persisted with lows 1-3°C above normal most days</div>
     </div>
-    <p class="lede">
-      I got tired of arguing from memory about whether April used to be nicer, whether May rain
-      actually cools the city, and whether October is secretly the wettest month. So this is the
-      chart I keep around.
-    </p>
   </div>
 </section>
 
@@ -738,13 +700,12 @@ h2 {
         <h2>Data and caveats</h2>
         <div class="copy">
           <p>
-            The site uses hourly data from Oikolab for one Bangalore coordinate from 1981 onward.
+            The site uses hourly weather data for one Bangalore coordinate from 1981 onward.
             Recent days can shift slightly after late-arriving corrections, so the updater keeps
             revisiting the last few days instead of treating yesterday's file as sacred.
           </p>
           <p>
-            Normals and records are computed from earlier years in the same archive. There is a
-            separate airport-station sanity check for temperature and wind. Rain is
+            There is a separate airport-station sanity check for temperature and wind. Rain is
             the annoying bit: Bangalore showers are local, and the public station feeds I checked
             do not give a clean rainfall series. So treat the exact millimetres with more caution
             than the broad pattern.
@@ -758,11 +719,11 @@ h2 {
         </div>
         <div>
           <h3>Data source</h3>
-          <p>Oikolab hourly temperature, rain, wind speed, and wind direction for Bangalore.</p>
+          <p>Hourly temperature, rain, wind speed, and wind direction for Bangalore.</p>
         </div>
         <div>
-          <h3>Downloads</h3>
-          <p><a href="data/bangalore_daily_weather.csv">Daily CSV</a> / <a href="https://github.com/skthewimp/bangalore-weather">GitHub repo</a>.</p>
+          <h3>Code</h3>
+          <p><a href="https://github.com/skthewimp/bangalore-weather">Everything is in the GitHub repo</a>.</p>
         </div>
       </div>
     </div>
@@ -771,8 +732,8 @@ h2 {
 
 <footer class="site-footer">
   <div class="footer-inner">
-    <span>Bangalore Weather by Karthik. <span id="footer-as-of">Data as of 21 May 2026.</span></span>
-    <span><a href="https://github.com/skthewimp/bangalore-weather">Source</a> / <a href="data/bangalore_daily_weather.csv">CSV</a> / <a href="feed.xml">RSS</a></span>
+    <span>Bangalore Weather by Karthik</span>
+    <span><a href="https://github.com/skthewimp/bangalore-weather">Source</a></span>
   </div>
 </footer>
 
@@ -791,16 +752,6 @@ function formatDate(value) {
 function setText(id, text) {
   const element = document.getElementById(id);
   if (element && text) element.textContent = text;
-}
-
-function setFreshness(asOf) {
-  const dot = document.querySelector(".status-dot");
-  if (!dot || !asOf) return;
-  const asOfDate = new Date(`${asOf}T00:00:00`);
-  if (Number.isNaN(asOfDate.getTime())) return;
-  const ageDays = Math.floor((Date.now() - asOfDate.getTime()) / 86400000);
-  const status = ageDays > 7 ? "old" : ageDays > 1 ? "stale" : "fresh";
-  dot.dataset.status = status;
 }
 
 function renderInsights(items) {
@@ -840,8 +791,6 @@ async function loadLatest() {
     const latest = await response.json();
     setText("hero-title", latest.title || "Bangalore's weather, one year at a time.");
     setText("as-of", latest.as_of ? `As of ${formatDate(latest.as_of)}` : "");
-    setFreshness(latest.as_of);
-    setText("footer-as-of", latest.as_of ? `Data as of ${formatDate(latest.as_of)}.` : "");
     setText("generated-on", latest.generated_on ? `Generated on ${formatDate(latest.generated_on)}` : "");
     renderInsights(latest.insights);
     if (latest.image) {
