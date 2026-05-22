@@ -697,8 +697,10 @@ message("Saved: ", outfile)
 docs_dir <- file.path(script_dir, "docs")
 docs_assets_dir <- file.path(docs_dir, "assets")
 docs_archive_dir <- file.path(docs_dir, "archive")
+docs_data_dir <- file.path(docs_dir, "data")
 dir.create(docs_assets_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(docs_archive_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(docs_data_dir, recursive = TRUE, showWarnings = FALSE)
 
 archive_name <- basename(outfile)
 archive_web_path <- file.path("archive", archive_name)
@@ -708,6 +710,13 @@ latest_file <- file.path(docs_assets_dir, "latest.png")
 
 file.copy(outfile, archive_file, overwrite = TRUE)
 file.copy(outfile, latest_file, overwrite = TRUE)
+
+daily_export <- temp_daily %>%
+  select(DT, High, Low) %>%
+  left_join(rain_daily %>% select(DT, Rain), by = "DT") %>%
+  arrange(DT)
+
+write_csv(daily_export, file.path(docs_data_dir, "bangalore_daily_weather.csv"))
 
 commentary_lines <- if (!is.null(commentary) && nzchar(commentary)) {
   commentary %>%
@@ -739,6 +748,37 @@ jsonlite::write_json(
   auto_unbox = TRUE,
   pretty = TRUE
 )
+
+rss_escape <- function(x) {
+  x %>%
+    str_replace_all("&", "&amp;") %>%
+    str_replace_all("<", "&lt;") %>%
+    str_replace_all(">", "&gt;") %>%
+    str_replace_all('"', "&quot;")
+}
+
+feed_items <- paste0(
+  "    <item>\n",
+  "      <title>", rss_escape(latest_payload$title), "</title>\n",
+  "      <link>https://weather.karthiks.co/</link>\n",
+  "      <guid>https://weather.karthiks.co/", archive_web_path, "</guid>\n",
+  "      <pubDate>", format(as.POSIXct(Sys.Date(), tz = "UTC"), "%a, %d %b %Y 00:00:00 GMT"), "</pubDate>\n",
+  "      <description>", rss_escape(paste(commentary_lines, collapse = " ")), "</description>\n",
+  "    </item>\n"
+)
+
+feed_xml <- paste0(
+  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+  "<rss version=\"2.0\">\n",
+  "  <channel>\n",
+  "    <title>Bangalore Weather</title>\n",
+  "    <link>https://weather.karthiks.co/</link>\n",
+  "    <description>Daily Bangalore weather chart updates.</description>\n",
+  feed_items,
+  "  </channel>\n",
+  "</rss>\n"
+)
+writeLines(feed_xml, file.path(docs_dir, "feed.xml"))
 
 archive_summary_from_stats <- function(stats) {
   rain_ratio <- ifelse(stats$annual_rain_avg > 0, stats$annual_rain_mm / stats$annual_rain_avg, 1)

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Bangalore Weather</title>
+    <link>https://weather.karthiks.co/</link>
+    <description>Daily Bangalore weather chart updates.</description>
+    <item>
+      <title>Bangalore&apos;s Weather in 2026</title>
+      <link>https://weather.karthiks.co/</link>
+      <guid>https://weather.karthiks.co/archive/bangalore_weather_20260522.png</guid>
+      <pubDate>Fri, 22 May 2026 00:00:00 GMT</pubDate>
+      <description>May 17 hit 36.7°C, the hottest day on record since 1981. May is still almost dry at 17.3mm versus 78mm expected through May 21. Warm nights persisted with lows 1-3°C above normal most days.</description>
+    </item>
+  </channel>
+</rss>

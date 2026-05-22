@@ -558,3 +558,18 @@ env R_ENVIRON_USER=/home/karthik/apps/bangalore-weather/.Renviron \
 - Updated `bangalore_weather_update.R` so the daily run detects year rollover, generates the completed previous year's annual chart if missing, copies it into `docs/assets/analysis/`, and prepends the year to `archive_years.json`.
 - Documented the rollover behavior in `docs/DEPLOY.md`.
 <!-- codex-session:2026-05-22-year-rollover:end -->
+
+<!-- codex-session:2026-05-22-site-critique:start -->
+## 2026-05-22 11:00 UTC | Codex session `site-critique`
+
+### User prompt
+> here are some more recommendations from a friend ... figure out importance / context and implement everything that is relevant
+
+### Work done
+- Implemented the high-leverage static-site hygiene from the critique: richer page title, canonical URL, OG/Twitter cards, theme color, author meta, JSON-LD Dataset schema, RSS link, and hero image preload.
+- Added `robots.txt`, `sitemap.xml`, `feed.xml`, `apple-touch-icon.png`, and a generated daily CSV at `docs/data/bangalore_daily_weather.csv`.
+- Updated the daily updater to refresh the daily CSV and RSS feed alongside `latest.json`.
+- Improved the hero with a clear chart-orientation line, a freshness status dot, download links, image dimensions, and better footer data-as-of handling.
+- Added skip link, reduced-motion handling, monospace code styling, and more specific alt text for analysis charts.
+- Deliberately did not add interactive charts in this pass because the project data-visualization guide says static charts by default unless explicitly requested.
+<!-- codex-session:2026-05-22-site-critique:end -->
