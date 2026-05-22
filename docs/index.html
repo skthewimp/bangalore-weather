@@ -300,6 +300,13 @@ h2 {
   pointer-events: none;
 }
 
+.request-frame {
+  width: 100%;
+  min-height: 560px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
 .note {
   margin-top: 10px;
   color: var(--muted);
@@ -572,7 +579,12 @@ h2 {
           </div>
         </div>
         <div>
-          <a class="button" id="request-link" data-disabled="true" aria-disabled="true">Google Form coming soon</a>
+          <iframe
+            class="request-frame"
+            src="https://docs.google.com/forms/d/e/1FAIpQLScWCjU1pV_8Hvv-Tj518yIeJNGA3mvLtjYQrkTNLyiarjIBCg/viewform?embedded=true"
+            title="Bangalore weather question form"
+            loading="lazy">Loading...</iframe>
+          <a class="button" id="request-link" href="https://forms.gle/Jrk3anPgUXi5E4wo9">Open form in a new tab</a>
           <p class="note">
             The form will collect questions for periodic review. No automatic answers, no surprise
             token bill, and no pretending every question deserves a generated paragraph.
@@ -626,8 +638,6 @@ h2 {
 </footer>
 
 <script>
-const requestFormUrl = "https://forms.gle/Jrk3anPgUXi5E4wo9";
-
 function formatDate(value) {
   if (!value) return "";
   const date = new Date(`${value}T00:00:00`);
@@ -674,17 +684,7 @@ async function loadLatest() {
   }
 }
 
-function configureRequestLink() {
-  const link = document.getElementById("request-link");
-  if (!link || !requestFormUrl) return;
-  link.href = requestFormUrl;
-  link.textContent = "Send a question";
-  link.removeAttribute("data-disabled");
-  link.removeAttribute("aria-disabled");
-}
-
 loadLatest();
-configureRequestLink();
 </script>
 </body>
 </html>
