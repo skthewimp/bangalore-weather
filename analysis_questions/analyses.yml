@@ -1,0 +1,57 @@
+- slug: summer-showers-cooling
+  publish: true
+  insightful: true
+  title: "Do summer showers actually cool Bangalore?"
+  summary: "The short answer is yes, but not in the simplistic way people usually mean it. Rainy afternoons start cooler, end cooler, and still have a proper post-rain drop. The effect changes across April and May."
+  image: "assets/analysis/summer_showers_cooling.png"
+  image_width: 1650
+  image_height: 825
+  image_alt: "Chart showing Bangalore summer showers cool rainy afternoons and produce a visible post-rain temperature drop."
+  links:
+    - label: "Open cooling chart"
+      href: "assets/analysis/summer_showers_cooling.png"
+    - label: "Open frequency chart"
+      href: "assets/analysis/summer_showers_frequency.png"
+
+- slug: bangalore-summers-hotter
+  publish: true
+  insightful: true
+  title: "Bangalore summers are getting hotter, but mostly at night"
+  summary: "The average summer afternoon high is nearly flat from 1981-2025. The clearer signal is warmer nights, a shrinking daily high-low range, and bigger spikes in days above 35 deg C."
+  image: "assets/analysis/bangalore_summer_warming.png"
+  image_width: 2160
+  image_height: 1620
+  image_alt: "Chart showing Bangalore summer highs are nearly flat while summer lows are rising and hot-day spikes are larger."
+  links:
+    - label: "Open warming chart"
+      href: "assets/analysis/bangalore_summer_warming.png"
+
+- slug: seasonal-wind-shift
+  publish: true
+  insightful: true
+  title: "The wind has a cleaner seasonal story than I expected"
+  summary: "From December through March, easterlies dominate. By late May, the city has flipped toward westerlies. The southwest monsoon is the cleanest signal in the dataset."
+  image: "assets/analysis/bangalore_wind_river.png"
+  image_width: 3600
+  image_height: 2100
+  image_alt: "Chart showing Bangalore winds shift from winter easterlies to late-May and monsoon westerlies."
+  links:
+    - label: "Open wind chart"
+      href: "assets/analysis/bangalore_wind_river.png"
+    - label: "Open rain-by-wind chart"
+      href: "assets/analysis/bangalore_rain_by_season_and_wind.png"
+
+- slug: pre-monsoon-evening-rain
+  publish: true
+  insightful: true
+  title: "Pre-monsoon rain is an evening creature"
+  summary: "April-May rain barely exists before afternoon, then climbs hard into the 5-6pm slot. The southwest monsoon still has an afternoon bump, but it is less fussy about the clock."
+  image: "assets/analysis/bangalore_rain_diurnal_by_season.png"
+  image_width: 3300
+  image_height: 1800
+  image_alt: "Chart showing Bangalore pre-monsoon rain concentrated in the late afternoon and early evening."
+  links:
+    - label: "Open diurnal chart"
+      href: "assets/analysis/bangalore_rain_diurnal_by_season.png"
+    - label: "Open rain-through-year chart"
+      href: "assets/analysis/bangalore_rain_river.png"

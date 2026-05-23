@@ -42,9 +42,22 @@ Static HTML artifacts intended for browser viewing can be published from the `do
 - Landing page: `docs/index.html`
 - Few-shot review cards: `docs/fewshot_annotations/review_cards.html`
 
+## Question-driven analyses
+
+Use `analysis_questions/question_template.Rmd` when a new weather question needs a
+notebook-backed answer. If the result is genuinely worth keeping, add it to
+`analysis_questions/analyses.yml` with `insightful: true` and `publish: true`, then run:
+
+```bash
+Rscript analysis_questions/update_site_analyses.R
+```
+
+That regenerates the `Analyses worth keeping around` section in `docs/index.html` using
+the same article format as the existing site.
+
 ## Requirements
 
-- R with packages: `tidytable`, `tidyverse`, `patchwork`, `lubridate`, `ggthemes`, `ggrepel`, `httr2`, `jsonlite`
+- R with packages: `tidytable`, `tidyverse`, `patchwork`, `lubridate`, `ggthemes`, `ggrepel`, `httr2`, `jsonlite`, `yaml`, `rmarkdown`
 - An [Anthropic API key](https://console.anthropic.com/) in `~/.Renviron` as `ANTHROPIC_API_KEY` (for AI commentary; charts render fine without it)
 - For `bangalore_weather_update.R`: an [Oikolab](https://oikolab.com/) API key in `~/.Renviron`
 

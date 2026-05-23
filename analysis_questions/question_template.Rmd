@@ -1,0 +1,164 @@
+---
+title: "Question analysis template"
+question: "Replace with the weather question"
+slug: "replace-with-short-slug"
+date: "`r Sys.Date()`"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 150
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+
+if (file.exists(file.path(root_dir, "data", "bangaloreWind.RData"))) {
+  load(file.path(root_dir, "data", "bangaloreWind.RData"))
+}
+
+theme_weather_question <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+      axis.title = element_blank(),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      legend.position = "none"
+    )
+}
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Data Prep
+
+```{r data-prep}
+temp_hourly <- blrTemp %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    doy = yday(DT),
+    hour = hour(DT),
+    temp_c = as.numeric(Temp)
+  ) %>%
+  filter(!is.na(temp_c))
+
+rain_hourly <- blrRain %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    doy = yday(DT),
+    hour = hour(DT),
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  filter(!is.na(rain_mm))
+
+daily_weather <- temp_hourly %>%
+  summarise(
+    tmin = min(temp_c, na.rm = TRUE),
+    tmax = max(temp_c, na.rm = TRUE),
+    tmean = mean(temp_c, na.rm = TRUE),
+    .by = c(date, year, month, doy)
+  ) %>%
+  left_join(
+    rain_hourly %>%
+      summarise(rain_mm = sum(rain_mm, na.rm = TRUE), .by = c(date, year, month, doy)),
+    by = c("date", "year", "month", "doy")
+  ) %>%
+  filter(is.finite(tmin), is.finite(tmax), !is.na(rain_mm))
+
+daily_weather %>%
+  summarise(
+    first_date = min(date),
+    last_date = max(date),
+    days = n(),
+    years = n_distinct(year)
+  )
+```
+
+## Analysis
+
+Replace this section with the smallest analysis that answers the question. Prefer
+transparent summaries over clever models.
+
+```{r starter-summary}
+daily_weather %>%
+  summarise(
+    mean_tmax = mean(tmax),
+    mean_tmin = mean(tmin),
+    mean_annual_rain = sum(rain_mm) / n_distinct(year)
+  )
+```
+
+## Chart
+
+Save any public chart to `docs/assets/analysis/` with a stable, descriptive filename.
+
+```{r starter-chart}
+chart_path <- file.path(chart_dir, paste0(rmarkdown::metadata$slug, ".png"))
+
+p <- daily_weather %>%
+  summarise(rain_mm = sum(rain_mm), .by = year) %>%
+  ggplot(aes(year, rain_mm)) +
+  geom_line(color = "#005566", linewidth = 0.8) +
+  geom_point(color = "#005566", size = 1.6) +
+  scale_y_continuous(labels = label_number(suffix = " mm")) +
+  labs(
+    title = "Replace this starter chart",
+    subtitle = "Annual rainfall, used here only as a template placeholder",
+    caption = "Hourly Oikolab/ERA5 archive for Bangalore"
+  ) +
+  theme_weather_question()
+
+p
+
+# Uncomment only when the chart is final enough to publish or review.
+# ggsave(chart_path, p, width = 12, height = 6, dpi = 180, bg = "white")
+```
+
+## Checks
+
+List sensitivity checks here: alternate thresholds, excluded years, seasonal boundaries,
+or any reason the answer might be fragile.
+
+## Verdict
+
+Insightful: no
+
+This template does not answer a real question yet. Do not add it to the site.
+
+Charts:
+
+- none

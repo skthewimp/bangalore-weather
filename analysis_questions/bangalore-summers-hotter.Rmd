@@ -1,0 +1,292 @@
+---
+title: "Have Bangalore summers become hotter?"
+question: "Have Bangalore summers become hotter over the years?"
+slug: "bangalore-summers-hotter"
+date: "2026-05-23"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 7,
+  dpi = 160
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(patchwork)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+
+theme_question <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+      axis.title = element_blank(),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      strip.text = element_text(color = "#3C3C3C", face = "bold"),
+      legend.position = "none"
+    )
+}
+
+slope_per_decade <- function(data, y) {
+  coef(lm(reformulate("year", y), data = data))[["year"]] * 10
+}
+
+label_slope <- function(x) {
+  paste0(ifelse(x >= 0, "+", ""), number(x, accuracy = 0.01), " deg C/decade")
+}
+```
+
+## Question
+
+Have Bangalore summers become hotter over the years?
+
+I treat summer as March-May, and use complete summers from 1981-2025. The local data
+also contains part of summer 2026, but May 2026 is not complete as of this analysis, so
+2026 is excluded from the trend estimates.
+
+## Data Prep
+
+```{r data-prep}
+temp_hourly <- blrTemp %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    hour = hour(DT),
+    temp_c = as.numeric(Temp)
+  ) %>%
+  filter(!is.na(temp_c), year >= 1981, year <= 2025)
+
+summer_hourly <- temp_hourly %>%
+  filter(month %in% 3:5)
+
+summer_daily <- summer_hourly %>%
+  summarise(
+    tmax = max(temp_c, na.rm = TRUE),
+    tmin = min(temp_c, na.rm = TRUE),
+    tmean = mean(temp_c, na.rm = TRUE),
+    .by = c(date, year)
+  ) %>%
+  filter(is.finite(tmax), is.finite(tmin), is.finite(tmean))
+
+coverage <- summer_daily %>%
+  summarise(days = n(), .by = year) %>%
+  summarise(
+    first_year = min(year),
+    last_year = max(year),
+    complete_summers = sum(days >= 92),
+    min_days = min(days),
+    max_days = max(days)
+  )
+
+coverage
+```
+
+## Yearly Summer Metrics
+
+```{r yearly-metrics}
+yearly <- summer_daily %>%
+  summarise(
+    mean_high = mean(tmax),
+    mean_low = mean(tmin),
+    mean_temp = mean(tmean),
+    mean_range = mean(tmax - tmin),
+    days_35 = sum(tmax >= 35),
+    days_36 = sum(tmax >= 36),
+    max_high = max(tmax),
+    .by = year
+  )
+
+trend_summary <- tibble(
+  metric = c("Mean daily high", "Mean daily low", "Mean temperature", "Daily high-low range", "Days at or above 35 deg C"),
+  trend_per_decade = c(
+    slope_per_decade(yearly, "mean_high"),
+    slope_per_decade(yearly, "mean_low"),
+    slope_per_decade(yearly, "mean_temp"),
+    slope_per_decade(yearly, "mean_range"),
+    coef(lm(days_35 ~ year, data = yearly))[["year"]] * 10
+  )
+)
+
+trend_summary
+```
+
+The main pattern is asymmetric. The average summer daily high has not moved much over
+the full 1981-2025 archive, while the average summer daily low has risen clearly.
+That means Bangalore's summer heat is showing up more in nights and persistence than
+in the average afternoon maximum.
+
+## Main Chart
+
+```{r main-chart, fig.width=12, fig.height=9}
+high_low <- yearly %>%
+  select(year, `Daily high` = mean_high, `Daily low` = mean_low) %>%
+  pivot_longer(-year, names_to = "metric", values_to = "temp_c") %>%
+  mutate(metric = factor(metric, levels = c("Daily high", "Daily low")))
+
+end_labels <- high_low %>%
+  group_by(metric) %>%
+  filter(year == max(year)) %>%
+  ungroup() %>%
+  left_join(
+    high_low %>%
+      summarise(slope = slope_per_decade(cur_data(), "temp_c"), .by = metric),
+    by = "metric"
+  ) %>%
+  mutate(label = paste0(metric, "\n", label_slope(slope)))
+
+p_trend <- ggplot(high_low, aes(year, temp_c, color = metric)) +
+  geom_point(size = 1.4, alpha = 0.55) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.9, linetype = "dashed") +
+  geom_text(
+    data = end_labels,
+    aes(label = label),
+    hjust = 0,
+    nudge_x = 1,
+    size = 3.2,
+    fontface = "bold",
+    lineheight = 0.95
+  ) +
+  scale_color_manual(values = c("Daily high" = "#CD3333", "Daily low" = "#2255AA")) +
+  scale_x_continuous(limits = c(1981, 2034), breaks = seq(1985, 2025, 10)) +
+  scale_y_continuous(labels = label_number(suffix = " deg C")) +
+  labs(
+    title = "Summer highs are nearly flat; summer lows are rising",
+    subtitle = "Mean daily maximum and minimum temperature in March-May, 1981-2025"
+  ) +
+  theme_question()
+
+hot_labels <- yearly %>%
+  filter(days_35 >= 10) %>%
+  mutate(label = paste0(year, "\n", days_35, " days"))
+
+p_hot <- ggplot(yearly, aes(year, days_35)) +
+  geom_col(fill = "#5f3946", width = 0.72) +
+  geom_smooth(method = "loess", se = FALSE, color = "#CD3333", linewidth = 0.8, span = 0.55) +
+  geom_text(
+    data = hot_labels,
+    aes(label = label),
+    vjust = -0.25,
+    size = 2.8,
+    fontface = "bold",
+    color = "#3C3C3C",
+    lineheight = 0.9
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.16))) +
+  labs(
+    title = "Hot-day spikes are larger in recent decades",
+    subtitle = "Number of March-May days with daily maximum at or above 35 deg C"
+  ) +
+  theme_question()
+
+p_range <- ggplot(yearly, aes(year, mean_range)) +
+  geom_point(color = "#005566", size = 1.5, alpha = 0.65) +
+  geom_smooth(method = "lm", se = FALSE, color = "#005566", linewidth = 0.9, linetype = "dashed") +
+  annotate(
+    "text",
+    x = 1984,
+    y = max(yearly$mean_range) - 0.15,
+    hjust = 0,
+    label = paste0(
+      "Daily range trend: ",
+      label_slope(slope_per_decade(yearly, "mean_range"))
+    ),
+    color = "#005566",
+    size = 3.2,
+    fontface = "bold"
+  ) +
+  scale_y_continuous(labels = label_number(suffix = " deg C")) +
+  labs(
+    title = "The daily high-low range is shrinking",
+    subtitle = "Summer nights are warming faster than summer afternoons"
+  ) +
+  theme_question()
+
+main_chart <- (p_trend / p_hot / p_range) +
+  plot_annotation(
+    title = "Have Bangalore summers become hotter?",
+    subtitle = "Yes, but the clearest change is warmer nights and bigger hot spells, not a large rise in the average afternoon high.",
+    caption = "Hourly Oikolab/ERA5 archive for Bangalore. Summer = March-May. Complete summers only, 1981-2025.",
+    theme = theme(
+      plot.title = element_text(color = "#3C3C3C", face = "bold", size = 18),
+      plot.subtitle = element_text(color = "#666666", size = 11),
+      plot.caption = element_text(color = "#666666", size = 8)
+    )
+  )
+
+main_chart
+
+chart_path <- file.path(chart_dir, "bangalore_summer_warming.png")
+ggsave(chart_path, main_chart, width = 12, height = 9, dpi = 180, bg = "white")
+```
+
+## Checks
+
+```{r checks}
+era_compare <- yearly %>%
+  mutate(era = case_when(
+    year <= 1995 ~ "1981-1995",
+    year >= 2011 ~ "2011-2025",
+    TRUE ~ NA_character_
+  )) %>%
+  filter(!is.na(era)) %>%
+  summarise(
+    mean_high = mean(mean_high),
+    mean_low = mean(mean_low),
+    days_35 = mean(days_35),
+    max_high = mean(max_high),
+    .by = era
+  )
+
+era_compare
+
+yearly %>%
+  arrange(desc(days_35)) %>%
+  select(year, mean_high, mean_low, days_35, days_36, max_high) %>%
+  slice_head(n = 10)
+```
+
+The result is robust to looking at eras instead of a linear trend: recent summers have
+warmer nights and more hot days on average, even though year-to-year weather still
+dominates any single summer. 2024 is an extreme outlier, so the claim should not be
+phrased as "every summer is hotter than before." It should be phrased as a shift in
+the distribution: nights have moved up, the daily high-low range has narrowed, and
+large hot spells are easier to get.
+
+## Verdict
+
+Insightful: yes
+
+Bangalore summers have become hotter, but not mainly because the average afternoon
+maximum has marched upward. From 1981-2025, summer daily highs are roughly flat, while
+summer daily lows rise by about 0.22 deg C per decade. The better public answer is:
+summer heat has become more persistent and more nocturnal, with recent decades also
+showing larger spikes in days above 35 deg C.
+
+Charts:
+
+- `docs/assets/analysis/bangalore_summer_warming.png`
