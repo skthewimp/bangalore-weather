@@ -795,7 +795,10 @@ async function loadLatest() {
     renderInsights(latest.insights);
     if (latest.image) {
       const chart = document.getElementById("latest-chart");
-      chart.src = latest.image;
+      const imageUrl = new URL(latest.image, window.location.href);
+      const imageVersion = latest.as_of || latest.generated_on || Date.now();
+      imageUrl.searchParams.set("v", imageVersion);
+      chart.src = imageUrl.toString();
     }
   } catch (error) {
     // Static fallback content above is good enough if the JSON fetch fails locally.

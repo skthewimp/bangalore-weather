@@ -1,12 +1,12 @@
 {
   "title": "Bangalore's Weather in 2026",
-  "as_of": "2026-05-21",
-  "generated_on": "2026-05-22",
-  "chart_date_text": "as of May 21",
+  "as_of": "2026-05-22",
+  "generated_on": "2026-05-23",
+  "chart_date_text": "as of May 22",
   "recent_window_days": 14,
-  "insights": ["May 17 hit a record heat of 36.7°C while rain remains scarce across the month", "Warm nights persist with lows averaging 2°C above normal despite sparse rainfall", "May so far is almost dry at 22% of normal, with only 17.3mm against expected 78mm"],
+  "insights": ["May is still almost dry at 23% of normal rainfall, with barely half the expected rainy days", "Warm nights persisted throughout, running 1-2°C above normal even as May nears its end", "May 21 brought the heaviest burst at 7.1mm, the only notably wet day in a sparse two weeks"],
   "image": "assets/latest.png",
-  "archive_image": "archive/bangalore_weather_20260522.png",
+  "archive_image": "archive/bangalore_weather_20260523.png",
   "source": "Oikolab",
   "repository": "https://github.com/skthewimp/bangalore-weather"
 }

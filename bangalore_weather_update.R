@@ -118,6 +118,13 @@ replace_window <- function(existing, replacement, start_dt, end_dt) {
     bind_rows(replacement)
 }
 
+replace_returned_window <- function(existing, replacement) {
+  if (nrow(replacement) == 0) return(existing)
+  start_dt <- min(replacement$DT, na.rm = TRUE)
+  end_dt <- max(replacement$DT, na.rm = TRUE) + hours(1)
+  replace_window(existing, replacement, start_dt, end_dt)
+}
+
 dedupe_on_dt <- function(df) {
   df %>%
     mutate(.source_rank = case_when(
@@ -211,8 +218,8 @@ if (do_historical_repair) {
     blrTempMonth <- fetch_oiko_series(win_start, win_end, "temperature", "Temp", model = "era5")
     blrRainMonth <- fetch_oiko_series(win_start, win_end, "total_precipitation", "Rain", model = "era5")
 
-    blrTemp <- replace_window(blrTemp, blrTempMonth, win_start, win_end)
-    blrRain <- replace_window(blrRain, blrRainMonth, win_start, win_end)
+    blrTemp <- replace_returned_window(blrTemp, blrTempMonth)
+    blrRain <- replace_returned_window(blrRain, blrRainMonth)
   }
 }
 
