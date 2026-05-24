@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blog - Bangalore Weather</title>
+<meta name="description" content="Short Bangalore weather analysis posts from the long-running hourly archive.">
+<link rel="canonical" href="https://weather.karthiks.co/blog/">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="alternate" type="application/rss+xml" title="Bangalore Weather blog" href="feed.xml">
+<style>
+:root { --paper:#fffdf8; --ink:#3C3C3C; --muted:#666; --line:#cfc6b4; --teal:#005566; --soft:#f4f1e9; --plum:#5f3946; }
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: var(--paper); font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; line-height: 1.55; }
+a { color: var(--teal); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.nav, main, footer { width: min(920px, calc(100vw - 32px)); margin: 0 auto; }
+.nav { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--line); }
+.brand { color: var(--ink); font-weight: 800; text-decoration: none; }
+.nav-links { display: flex; gap: 16px; flex-wrap: wrap; font-size: .92rem; }
+.nav-links a { color: var(--ink); text-decoration: none; }
+header { background: #e5e1d8; border-bottom: 1px solid var(--line); }
+.hero { width: min(920px, calc(100vw - 32px)); margin: 0 auto; padding: 46px 0 38px; }
+.kicker { margin: 0 0 10px; color: var(--plum); font-weight: 800; font-size: .82rem; letter-spacing: .08em; text-transform: uppercase; }
+h1 { margin: 0; font-size: clamp(2.1rem, 5vw, 3.8rem); line-height: 1.06; letter-spacing: 0; }
+.lede { max-width: 760px; margin: 16px 0 0; font-size: 1.08rem; }
+main { padding: 36px 0 54px; }
+.post-list { display: grid; gap: 22px; }
+.post-card { display: grid; grid-template-columns: minmax(180px, .38fr) minmax(0, .62fr); gap: 22px; padding-top: 22px; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.post-card img { width: 100%; border: 1px solid var(--line); background: white; }
+.post-card h2 { margin: 0 0 8px; font-size: 1.18rem; line-height: 1.2; }
+.post-card p { margin: 0; color: var(--muted); }
+footer { padding: 24px 0 36px; border-top: 1px solid var(--line); color: var(--muted); font-size: .92rem; }
+@media (max-width: 720px) { .nav, .post-card { grid-template-columns: 1fr; } .nav { align-items: flex-start; flex-direction: column; padding: 14px 0; } }
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Main navigation">
+  <a class="brand" href="../">Bangalore Weather</a>
+  <div class="nav-links">
+    <a href="../#today">Today</a>
+    <a href="../#blog">Blog</a>
+    <a href="feed.xml">RSS</a>
+    <a href="../#archive">Years</a>
+    <a href="../#data">Data</a>
+  </div>
+</nav>
+<header>
+  <div class="hero">
+    <p class="kicker">Blog</p>
+    <h1>Analyses worth keeping around.</h1>
+    <p class="lede">Short posts from the Bangalore weather archive: the bits that needed more than a chart caption.</p>
+  </div>
+</header>
+<main>
+  <div class="post-list">
+    <a class="post-card" href="summer-showers-cooling.html">
+      <img src="../assets/analysis/summer_showers_cooling.png" width="1650" height="825" loading="lazy" alt="">
+      <div><h2>Do summer showers actually cool Bangalore?</h2><p>Rainy afternoons start cooler, end cooler, and still show a proper post-rain drop.</p></div>
+    </a>
+    <a class="post-card" href="bangalore-summers-hotter.html">
+      <img src="../assets/analysis/bangalore_summer_warming.png" width="2160" height="1620" loading="lazy" alt="">
+      <div><h2>Bangalore summers are getting hotter, but mostly at night</h2><p>The clearest change is warmer nights, not a big rise in the average afternoon high.</p></div>
+    </a>
+    <a class="post-card" href="seasonal-wind-shift.html">
+      <img src="../assets/analysis/bangalore_wind_river.png" width="3600" height="2100" loading="lazy" alt="">
+      <div><h2>The wind has a cleaner seasonal story than I expected</h2><p>The city flips from winter easterlies to monsoon westerlies in a surprisingly readable way.</p></div>
+    </a>
+    <a class="post-card" href="pre-monsoon-evening-rain.html">
+      <img src="../assets/analysis/bangalore_rain_diurnal_by_season.png" width="3300" height="1800" loading="lazy" alt="">
+      <div><h2>Pre-monsoon rain is an evening creature</h2><p>April-May rain barely exists before afternoon, then climbs hard into the 5-6pm slot.</p></div>
+    </a>
+  </div>
+</main>
+<footer>Weather charts and analysis by Karthik. <a href="feed.xml">Blog RSS</a>.</footer>
+</body>
+</html>

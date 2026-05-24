@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/latest.png">
 <link rel="alternate" type="application/rss+xml" title="Bangalore Weather updates" href="/feed.xml">
+<link rel="alternate" type="application/rss+xml" title="Bangalore Weather blog" href="/blog/feed.xml">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Bangalore Weather">
 <meta property="og:title" content="Bangalore Weather - daily charts since 1981">
@@ -301,6 +302,19 @@ h2 {
   line-height: 1.2;
 }
 
+.analysis-copy-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.analysis-copy-link:hover h3 {
+  color: var(--teal);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
 .analysis-item p {
   margin: 0;
   color: var(--ink);
@@ -508,7 +522,7 @@ h2 {
     <a class="brand" href="#today">Bangalore Weather</a>
     <div class="nav-links">
       <a href="#today">Today</a>
-      <a href="#analysis">Analysis</a>
+      <a href="#blog">Blog</a>
       <a href="#archive">Years</a>
       <a href="#requests">Questions</a>
       <a href="#data">Data</a>
@@ -562,27 +576,29 @@ h2 {
     </div>
   </section>
 
-  <section class="section" id="analysis">
+  <section class="section" id="blog">
     <div class="section-inner">
       <div class="section-head">
-        <h2>Analyses worth keeping around</h2>
+        <h2>Blog</h2>
         <p>
-          These are the pieces that came out of staring at the same data for too long. Some are
-          obvious after you see the chart. Some were messier than I expected.
+          Analyses worth keeping around, now as proper posts. These came out of staring at
+          the same data for too long; some were obvious after the chart, some were messier.
         </p>
       </div>
 
       <div class="analysis-list">
         <!-- ANALYSES:START -->
         <article class="analysis-item">
-          <a href="assets/analysis/summer_showers_cooling.png">
+          <a href="blog/summer-showers-cooling.html" aria-label="Read blog post: Do summer showers actually cool Bangalore?">
             <img src="assets/analysis/summer_showers_cooling.png" width="1650" height="825" loading="lazy" alt="Chart showing Bangalore summer showers cool rainy afternoons and produce a visible post-rain temperature drop.">
           </a>
           <div>
-            <h3>Do summer showers actually cool Bangalore?</h3>
-            <p>
-              The short answer is yes, but not in the simplistic way people usually mean it. Rainy afternoons start cooler, end cooler, and still have a proper post-rain drop. The effect changes across April and May.
-            </p>
+            <a class="analysis-copy-link" href="blog/summer-showers-cooling.html">
+              <h3>Do summer showers actually cool Bangalore?</h3>
+              <p>
+                The short answer is yes, but not in the simplistic way people usually mean it. Rainy afternoons start cooler, end cooler, and still have a proper post-rain drop. The effect changes across April and May.
+              </p>
+            </a>
             <div class="links">
               <a href="assets/analysis/summer_showers_cooling.png">Open cooling chart</a>
               <a href="assets/analysis/summer_showers_frequency.png">Open frequency chart</a>
@@ -590,28 +606,32 @@ h2 {
           </div>
         </article>
         <article class="analysis-item">
-          <a href="assets/analysis/bangalore_summer_warming.png">
+          <a href="blog/bangalore-summers-hotter.html" aria-label="Read blog post: Bangalore summers are getting hotter, but mostly at night">
             <img src="assets/analysis/bangalore_summer_warming.png" width="2160" height="1620" loading="lazy" alt="Chart showing Bangalore summer highs are nearly flat while summer lows are rising and hot-day spikes are larger.">
           </a>
           <div>
-            <h3>Bangalore summers are getting hotter, but mostly at night</h3>
-            <p>
-              The average summer afternoon high is nearly flat from 1981-2025. The clearer signal is warmer nights, a shrinking daily high-low range, and bigger spikes in days above 35 deg C.
-            </p>
+            <a class="analysis-copy-link" href="blog/bangalore-summers-hotter.html">
+              <h3>Bangalore summers are getting hotter, but mostly at night</h3>
+              <p>
+                The average summer afternoon high is nearly flat from 1981-2025. The clearer signal is warmer nights, a shrinking daily high-low range, and bigger spikes in days above 35 deg C.
+              </p>
+            </a>
             <div class="links">
               <a href="assets/analysis/bangalore_summer_warming.png">Open warming chart</a>
             </div>
           </div>
         </article>
         <article class="analysis-item">
-          <a href="assets/analysis/bangalore_wind_river.png">
+          <a href="blog/seasonal-wind-shift.html" aria-label="Read blog post: The wind has a cleaner seasonal story than I expected">
             <img src="assets/analysis/bangalore_wind_river.png" width="3600" height="2100" loading="lazy" alt="Chart showing Bangalore winds shift from winter easterlies to late-May and monsoon westerlies.">
           </a>
           <div>
-            <h3>The wind has a cleaner seasonal story than I expected</h3>
-            <p>
-              From December through March, easterlies dominate. By late May, the city has flipped toward westerlies. The southwest monsoon is the cleanest signal in the dataset.
-            </p>
+            <a class="analysis-copy-link" href="blog/seasonal-wind-shift.html">
+              <h3>The wind has a cleaner seasonal story than I expected</h3>
+              <p>
+                From December through March, easterlies dominate. By late May, the city has flipped toward westerlies. The southwest monsoon is the cleanest signal in the dataset.
+              </p>
+            </a>
             <div class="links">
               <a href="assets/analysis/bangalore_wind_river.png">Open wind chart</a>
               <a href="assets/analysis/bangalore_rain_by_season_and_wind.png">Open rain-by-wind chart</a>
@@ -619,14 +639,16 @@ h2 {
           </div>
         </article>
         <article class="analysis-item">
-          <a href="assets/analysis/bangalore_rain_diurnal_by_season.png">
+          <a href="blog/pre-monsoon-evening-rain.html" aria-label="Read blog post: Pre-monsoon rain is an evening creature">
             <img src="assets/analysis/bangalore_rain_diurnal_by_season.png" width="3300" height="1800" loading="lazy" alt="Chart showing Bangalore pre-monsoon rain concentrated in the late afternoon and early evening.">
           </a>
           <div>
-            <h3>Pre-monsoon rain is an evening creature</h3>
-            <p>
-              April-May rain barely exists before afternoon, then climbs hard into the 5-6pm slot. The southwest monsoon still has an afternoon bump, but it is less fussy about the clock.
-            </p>
+            <a class="analysis-copy-link" href="blog/pre-monsoon-evening-rain.html">
+              <h3>Pre-monsoon rain is an evening creature</h3>
+              <p>
+                April-May rain barely exists before afternoon, then climbs hard into the 5-6pm slot. The southwest monsoon still has an afternoon bump, but it is less fussy about the clock.
+              </p>
+            </a>
             <div class="links">
               <a href="assets/analysis/bangalore_rain_diurnal_by_season.png">Open diurnal chart</a>
               <a href="assets/analysis/bangalore_rain_river.png">Open rain-through-year chart</a>
@@ -741,7 +763,7 @@ h2 {
 <footer class="site-footer">
   <div class="footer-inner">
     <span>Bangalore Weather by Karthik</span>
-    <span><a href="https://github.com/skthewimp/bangalore-weather">Source</a></span>
+    <span><a href="feed.xml">Weather RSS</a> / <a href="blog/feed.xml">Blog RSS</a> / <a href="https://github.com/skthewimp/bangalore-weather">Source</a></span>
   </div>
 </footer>
 

@@ -45,10 +45,11 @@ render_links <- function(links) {
 render_item <- function(item) {
   width <- item$image_width %||% ""
   height <- item$image_height %||% ""
+  post_href <- item$blog_url %||% item$image
 
   c(
     '        <article class="analysis-item">',
-    sprintf('          <a href="%s">', escape_html(item$image)),
+    sprintf('          <a href="%s" aria-label="Read blog post: %s">', escape_html(post_href), escape_html(item$title)),
     sprintf(
       '            <img src="%s" width="%s" height="%s" loading="lazy" alt="%s">',
       escape_html(item$image),
@@ -58,10 +59,12 @@ render_item <- function(item) {
     ),
     '          </a>',
     '          <div>',
-    sprintf('            <h3>%s</h3>', escape_html(item$title)),
-    '            <p>',
-    sprintf('              %s', escape_html(item$summary)),
-    '            </p>',
+    sprintf('            <a class="analysis-copy-link" href="%s">', escape_html(post_href)),
+    sprintf('              <h3>%s</h3>', escape_html(item$title)),
+    '              <p>',
+    sprintf('                %s', escape_html(item$summary)),
+    '              </p>',
+    '            </a>',
     render_links(item$links),
     '          </div>',
     '        </article>'

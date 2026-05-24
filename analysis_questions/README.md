@@ -24,8 +24,13 @@ local Bangalore weather data.
 Rscript analysis_questions/update_site_analyses.R
 ```
 
-This rewrites the `Analyses worth keeping around` articles in `docs/index.html`
-from `analyses.yml`.
+This rewrites the homepage blog cards in `docs/index.html` from `analyses.yml`.
+If an entry has a `blog_url`, the card points readers to the post instead of directly
+to the chart.
+
+Published blog posts live in `docs/blog/`. Keep the visible disclosure
+`This post is AI-written.` at the top of every post, and add each new post to
+`docs/blog/feed.xml`.
 
 ## Insightfulness Gate
 

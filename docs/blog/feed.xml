@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Bangalore Weather Blog</title>
+    <link>https://weather.karthiks.co/blog/</link>
+    <description>Short Bangalore weather analysis posts from the long-running hourly archive.</description>
+    <language>en</language>
+    <lastBuildDate>Sun, 24 May 2026 00:00:00 GMT</lastBuildDate>
+    <item>
+      <title>Pre-monsoon rain is an evening creature</title>
+      <link>https://weather.karthiks.co/blog/pre-monsoon-evening-rain.html</link>
+      <guid>https://weather.karthiks.co/blog/pre-monsoon-evening-rain.html</guid>
+      <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
+      <description>This post is AI-written. April-May rain barely exists before afternoon, then climbs hard into the 5-6pm slot.</description>
+    </item>
+    <item>
+      <title>The wind has a cleaner seasonal story than I expected</title>
+      <link>https://weather.karthiks.co/blog/seasonal-wind-shift.html</link>
+      <guid>https://weather.karthiks.co/blog/seasonal-wind-shift.html</guid>
+      <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
+      <description>This post is AI-written. Bangalore flips from winter easterlies to late-May and monsoon westerlies.</description>
+    </item>
+    <item>
+      <title>Bangalore summers are getting hotter, but mostly at night</title>
+      <link>https://weather.karthiks.co/blog/bangalore-summers-hotter.html</link>
+      <guid>https://weather.karthiks.co/blog/bangalore-summers-hotter.html</guid>
+      <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
+      <description>This post is AI-written. The clearer signal is warmer nights, a shrinking daily high-low range, and bigger hot-day spikes.</description>
+    </item>
+    <item>
+      <title>Do summer showers actually cool Bangalore?</title>
+      <link>https://weather.karthiks.co/blog/summer-showers-cooling.html</link>
+      <guid>https://weather.karthiks.co/blog/summer-showers-cooling.html</guid>
+      <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
+      <description>This post is AI-written. Rainy afternoons start cooler, end cooler, and still have a proper post-rain drop.</description>
+    </item>
+  </channel>
+</rss>

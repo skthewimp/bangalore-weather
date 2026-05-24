@@ -2,31 +2,67 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://weather.karthiks.co/</loc>
-    <lastmod>2026-05-23</lastmod>
+    <lastmod>2026-05-24</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://weather.karthiks.co/latest.json</loc>
-    <lastmod>2026-05-23</lastmod>
+    <lastmod>2026-05-24</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://weather.karthiks.co/feed.xml</loc>
-    <lastmod>2026-05-23</lastmod>
+    <lastmod>2026-05-24</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://weather.karthiks.co/blog/</loc>
+    <lastmod>2026-05-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://weather.karthiks.co/blog/feed.xml</loc>
+    <lastmod>2026-05-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://weather.karthiks.co/blog/summer-showers-cooling.html</loc>
+    <lastmod>2026-05-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://weather.karthiks.co/blog/bangalore-summers-hotter.html</loc>
+    <lastmod>2026-05-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://weather.karthiks.co/blog/seasonal-wind-shift.html</loc>
+    <lastmod>2026-05-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://weather.karthiks.co/blog/pre-monsoon-evening-rain.html</loc>
+    <lastmod>2026-05-24</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://weather.karthiks.co/archive_years.json</loc>
-    <lastmod>2026-05-23</lastmod>
+    <lastmod>2026-05-24</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
     <loc>https://weather.karthiks.co/data/bangalore_daily_weather.csv</loc>
-    <lastmod>2026-05-23</lastmod>
+    <lastmod>2026-05-24</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>
   </url>

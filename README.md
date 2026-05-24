@@ -52,8 +52,13 @@ notebook-backed answer. If the result is genuinely worth keeping, add it to
 Rscript analysis_questions/update_site_analyses.R
 ```
 
-That regenerates the `Analyses worth keeping around` section in `docs/index.html` using
-the same article format as the existing site.
+That regenerates the homepage blog cards in `docs/index.html` using the same article
+format as the existing site. If the entry has a `blog_url`, the card points to the
+corresponding post instead of directly to the chart.
+
+Blog posts live in `docs/blog/`. Each post must include the visible disclosure
+`This post is AI-written.` at the top of the article body and should be added to
+`docs/blog/feed.xml`.
 
 ## Requirements
 

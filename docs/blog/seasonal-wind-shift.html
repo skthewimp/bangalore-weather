@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The wind has a cleaner seasonal story than I expected - Bangalore Weather</title>
+<meta name="description" content="A short Bangalore wind and rainfall analysis using hourly wind direction and rain data.">
+<link rel="canonical" href="https://weather.karthiks.co/blog/seasonal-wind-shift.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="alternate" type="application/rss+xml" title="Bangalore Weather blog" href="feed.xml">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The wind has a cleaner seasonal story than I expected">
+<meta property="og:description" content="Bangalore flips from winter easterlies to late-May and monsoon westerlies.">
+<meta property="og:image" content="https://weather.karthiks.co/assets/analysis/bangalore_wind_river.png">
+<style>
+:root { --paper:#fffdf8; --ink:#3C3C3C; --muted:#666; --line:#cfc6b4; --teal:#005566; --weather-bg:#e5e1d8; --plum:#5f3946; }
+* { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--paper); font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; line-height:1.62; }
+a { color:var(--teal); text-decoration-thickness:1px; text-underline-offset:3px; } img { display:block; max-width:100%; height:auto; }
+.nav, article, footer { width:min(860px, calc(100vw - 32px)); margin:0 auto; } .nav { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:18px; border-bottom:1px solid var(--line); }
+.brand { color:var(--ink); font-weight:800; text-decoration:none; } .nav-links { display:flex; gap:16px; flex-wrap:wrap; font-size:.92rem; } .nav-links a { color:var(--ink); text-decoration:none; }
+header { background:var(--weather-bg); border-bottom:1px solid var(--line); } .hero { width:min(860px, calc(100vw - 32px)); margin:0 auto; padding:42px 0 34px; }
+.kicker { margin:0 0 10px; color:var(--plum); font-weight:800; font-size:.82rem; letter-spacing:.08em; text-transform:uppercase; } h1 { margin:0; font-size:clamp(2rem,4.8vw,3.5rem); line-height:1.08; letter-spacing:0; }
+.lede { max-width:760px; margin:16px 0 0; font-size:1.08rem; } article { padding:34px 0 54px; } p { margin:0 0 18px; } figure { margin:28px 0; } figure img { border:1px solid var(--line); background:white; } figcaption { margin-top:8px; color:var(--muted); font-size:.9rem; }
+.ai-disclosure { margin:0 0 22px; padding:10px 12px; border-top:2px solid var(--line); border-bottom:1px solid var(--line); color:var(--muted); font-size:.92rem; }
+footer { padding:24px 0 36px; border-top:1px solid var(--line); color:var(--muted); font-size:.92rem; } @media (max-width:720px){ .nav{align-items:flex-start; flex-direction:column; padding:14px 0;} }
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Main navigation"><a class="brand" href="../">Bangalore Weather</a><div class="nav-links"><a href="../#blog">Blog</a><a href="../#archive">Years</a><a href="../#data">Data</a></div></nav>
+<header><div class="hero"><p class="kicker">Analysis</p><h1>The wind has a cleaner seasonal story than I expected</h1><p class="lede">I added wind direction to the weather archive and, after a few false starts, the monsoon suddenly became visible.</p></div></header>
+<article>
+  <p class="ai-disclosure">This post is AI-written.</p>
+  <p>I had been pulling Bangalore temperature and rain for a while before adding wind. The first thing I tried was the obvious one: wind roses by month. It was technically fine and visually annoying. Twelve little polar plots, lots of spokes, no real sense of movement through the year.</p>
+  <p>The better question was simpler. Across the year, where does the wind come from? I weighted each hour by wind speed, because a faint easterly and a strong westerly should not count the same. That gave me a river chart, and the seasonal pattern was cleaner than I expected.</p>
+  <figure><img src="../assets/analysis/bangalore_wind_river.png" width="3600" height="2100" alt="Chart showing Bangalore winds shift from winter easterlies to late-May and monsoon westerlies."><figcaption>Winter and early summer are dominated by easterlies. By late May the city has flipped toward westerlies.</figcaption></figure>
+  <p>From December through March, easterlies dominate. By late May, the wind has turned. June through September is overwhelmingly westerly, which is exactly the southwest monsoon announcing itself in the data. October is messy, which feels right. November starts handing the city back to the easterlies.</p>
+  <p>The rain side is even more revealing. Pre-monsoon rain is messy in origin. Westerlies bring the largest single share, but a meaningful chunk comes from the eastern half of the compass too. That fits the character of April-May storms: local convective events that build out of hot afternoons rather than a single large-scale conveyor belt.</p>
+  <figure><img src="../assets/analysis/bangalore_rain_by_season_and_wind.png" width="3300" height="2100" alt="Chart showing Bangalore rainfall by season decomposed by wind direction."><figcaption>The southwest monsoon is the clean signal: most June-September rain arrives with westerly winds.</figcaption></figure>
+  <p>The southwest monsoon is different. Most June-September rain falls with wind from the west, and if you add the southwest and northwest sectors, the dominance is hard to miss. This is the one-engine season. The October-November rain is the nice complication. We call it the northeast monsoon, and easterlies do matter, but the westerlies do not simply vanish on schedule. The monsoon does not leave like a school bell rang. It dribbles out.</p>
+</article>
+<footer><a href="../#blog">Back to blog</a></footer>
+</body>
+</html>

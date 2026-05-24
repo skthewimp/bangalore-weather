@@ -3,6 +3,7 @@
   insightful: true
   title: "Do summer showers actually cool Bangalore?"
   summary: "The short answer is yes, but not in the simplistic way people usually mean it. Rainy afternoons start cooler, end cooler, and still have a proper post-rain drop. The effect changes across April and May."
+  blog_url: "blog/summer-showers-cooling.html"
   image: "assets/analysis/summer_showers_cooling.png"
   image_width: 1650
   image_height: 825
@@ -18,6 +19,7 @@
   insightful: true
   title: "Bangalore summers are getting hotter, but mostly at night"
   summary: "The average summer afternoon high is nearly flat from 1981-2025. The clearer signal is warmer nights, a shrinking daily high-low range, and bigger spikes in days above 35 deg C."
+  blog_url: "blog/bangalore-summers-hotter.html"
   image: "assets/analysis/bangalore_summer_warming.png"
   image_width: 2160
   image_height: 1620
@@ -31,6 +33,7 @@
   insightful: true
   title: "The wind has a cleaner seasonal story than I expected"
   summary: "From December through March, easterlies dominate. By late May, the city has flipped toward westerlies. The southwest monsoon is the cleanest signal in the dataset."
+  blog_url: "blog/seasonal-wind-shift.html"
   image: "assets/analysis/bangalore_wind_river.png"
   image_width: 3600
   image_height: 2100
@@ -46,6 +49,7 @@
   insightful: true
   title: "Pre-monsoon rain is an evening creature"
   summary: "April-May rain barely exists before afternoon, then climbs hard into the 5-6pm slot. The southwest monsoon still has an afternoon bump, but it is less fussy about the clock."
+  blog_url: "blog/pre-monsoon-evening-rain.html"
   image: "assets/analysis/bangalore_rain_diurnal_by_season.png"
   image_width: 3300
   image_height: 1800
