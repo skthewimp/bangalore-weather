@@ -46,16 +46,17 @@ Static HTML artifacts intended for browser viewing can be published from the `do
 
 Use `analysis_questions/question_template.Rmd` when a new weather question needs a
 notebook-backed answer. If the result is genuinely worth keeping, write a blog post
-in `docs/blog/`, add it to `docs/blog/feed.xml`, add it to
-`analysis_questions/analyses.yml` with `insightful: true`, `publish: true`, and a
-`blog_url`, then run:
+in `docs/blog/`, add it to the top of `docs/blog/index.html` and
+`docs/blog/feed.xml`, add it to the top of `analysis_questions/analyses.yml` with
+`insightful: true`, `publish: true`, and a `blog_url`, then run:
 
 ```bash
 Rscript analysis_questions/update_site_analyses.R
 ```
 
-That regenerates the homepage blog cards in `docs/index.html` using the same article
-format as the existing site. Published, insightful entries must point to a blog post.
+That regenerates the latest three homepage blog cards in `docs/index.html` using the
+same article format as the existing site. Published, insightful entries must point to
+a blog post.
 
 Blog posts live in `docs/blog/`. Each post must include the visible disclosure
 `This post is AI-written.` at the top of the article body. The updater fails if a

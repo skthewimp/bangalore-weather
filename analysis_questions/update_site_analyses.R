@@ -126,8 +126,9 @@ if (is.na(start) || is.na(end) || start >= end) {
   stop("Could not find analysis markers in docs/index.html.")
 }
 
-rendered <- unlist(lapply(published, render_item), use.names = FALSE)
+homepage_items <- head(published, 3)
+rendered <- unlist(lapply(homepage_items, render_item), use.names = FALSE)
 updated <- c(html[seq_len(start)], rendered, html[end:length(html)])
 writeLines(updated, index_path)
 
-message("Updated ", index_path, " with ", length(published), " published analyses.")
+message("Updated ", index_path, " with ", length(homepage_items), " homepage analyses from ", length(published), " published analyses.")

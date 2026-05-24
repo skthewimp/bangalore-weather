@@ -19,16 +19,18 @@ local Bangalore weather data.
 5. Only if the result is genuinely insightful, write a blog post in `docs/blog/`.
    Keep it around 400 words, include a few relevant charts/images, and put
    `This post is AI-written.` at the top of the article body.
-6. Add the post to `docs/blog/feed.xml`.
-7. Add an entry to `analyses.yml` with `insightful: true`, `publish: true`, and
-   `blog_url: "blog/<slug>.html"`.
+6. Add the post to the top of `docs/blog/index.html` and `docs/blog/feed.xml`.
+   The blog is additive and reverse chronological.
+7. Add an entry to the top of `analyses.yml` with `insightful: true`,
+   `publish: true`, and `blog_url: "blog/<slug>.html"`.
 8. Run:
 
 ```bash
 Rscript analysis_questions/update_site_analyses.R
 ```
 
-This rewrites the homepage blog cards in `docs/index.html` from `analyses.yml`.
+This rewrites the homepage blog cards in `docs/index.html` from the first three
+published entries in `analyses.yml`.
 Published, insightful entries must have a `blog_url`; the updater fails if the blog
 post is missing, lacks the AI-written disclosure, or is absent from `docs/blog/feed.xml`.
 
