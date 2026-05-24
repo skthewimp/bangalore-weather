@@ -3,6 +3,11 @@
 Use this workflow when a weather question comes in and we want to answer it from the
 local Bangalore weather data.
 
+For agent-assisted work in this repo, this workflow is the default path for weather
+questions asked in chat. A quick inline answer is fine only when the user explicitly
+asks for one. Otherwise, create the notebook, run the checks, and make the
+publish/no-publish decision in the repo.
+
 ## Process
 
 1. Copy `question_template.Rmd` to a new notebook in this directory.
@@ -19,6 +24,8 @@ local Bangalore weather data.
 5. Only if the result is genuinely insightful, write a blog post in `docs/blog/`.
    Keep it around 400 words, include a few relevant charts/images, and put
    `This post is AI-written.` at the top of the article body.
+   End the post with an `Original question` section containing the exact user prompt
+   that triggered the workflow.
 6. Add the post to the top of `docs/blog/index.html` and `docs/blog/feed.xml`.
    The blog is additive and reverse chronological.
 7. Add an entry to the top of `analyses.yml` with `insightful: true`,

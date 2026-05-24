@@ -1,3 +1,19 @@
+- slug: dry-may-monsoon-signal
+  publish: true
+  insightful: true
+  title: "Bangalore is dry. That does not make early May a monsoon oracle."
+  summary: "2026 is genuinely dry so far: third-driest through May 23 in the local archive. But first-half May rain has almost no relationship with June-September rain."
+  blog_url: "blog/dry-may-monsoon-signal.html"
+  image: "assets/analysis/dry_may_2026_rainfall_rank.png"
+  image_width: 2160
+  image_height: 1080
+  image_alt: "Chart showing 2026 as one of Bangalore's driest years through May 23."
+  links:
+    - label: "Open dry-year chart"
+      href: "assets/analysis/dry_may_2026_rainfall_rank.png"
+    - label: "Open monsoon signal chart"
+      href: "assets/analysis/early_may_rain_monsoon_signal.png"
+
 - slug: pre-monsoon-evening-rain
   publish: true
   insightful: true

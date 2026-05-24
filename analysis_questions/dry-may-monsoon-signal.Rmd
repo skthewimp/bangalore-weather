@@ -1,0 +1,351 @@
+---
+title: "Is dry pre-monsoon rain a monsoon signal?"
+question: "How common is Bangalore being this dry by May 24, 2026, and what does low rain in the first half of May imply for the overall monsoon?"
+trigger_prompt: "this year seems to be incredibly dry. not much rain at all so far (we're on may24 now). How common is this? and what does low rain in the first half of May imply for the overall monsoon?"
+slug: "dry-may-monsoon-signal"
+date: "2026-05-24"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 150
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(ggrepel)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+theme_weather_question <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey91", linewidth = 0.3),
+      axis.title = element_text(color = "#3C3C3C", face = "bold"),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      strip.text = element_text(color = "#3C3C3C", face = "bold", size = rel(1)),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      legend.position = "none",
+      plot.margin = margin(14, 18, 14, 14)
+    )
+}
+
+period_total <- function(data, start_md, end_md, years) {
+  purrr::map_dfr(years, function(y) {
+    start_date <- as.Date(sprintf("%d-%s", y, start_md))
+    end_date <- as.Date(sprintf("%d-%s", y, end_md))
+    expected_days <- as.integer(end_date - start_date) + 1
+    period_data <- data %>% filter(date >= start_date, date <= end_date)
+
+    tibble(
+      year = y,
+      rain_mm = if (nrow(period_data) == expected_days) sum(period_data$rain_mm, na.rm = TRUE) else NA_real_,
+      wet_days_1mm = if (nrow(period_data) == expected_days) sum(period_data$rain_mm >= 1, na.rm = TRUE) else NA_integer_,
+      max_day_mm = if (nrow(period_data) == expected_days) max(period_data$rain_mm, na.rm = TRUE) else NA_real_
+    )
+  }) %>%
+    filter(!is.na(rain_mm))
+}
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Data Prep
+
+This uses the public daily archive in `docs/data/bangalore_daily_weather.csv`. The current
+archive is complete through May 23, 2026, so all "by May 24" comparisons mean rainfall
+observed through May 23.
+
+```{r data-prep}
+daily_weather <- read_csv(
+  file.path(root_dir, "docs", "data", "bangalore_daily_weather.csv"),
+  show_col_types = FALSE
+) %>%
+  transmute(
+    date = as.Date(DT),
+    year = year(date),
+    month = month(date),
+    rain_mm = as.numeric(Rain),
+    tmax = as.numeric(High),
+    tmin = as.numeric(Low)
+  ) %>%
+  filter(!is.na(date), !is.na(rain_mm))
+
+daily_weather %>%
+  summarise(
+    first_date = min(date),
+    last_date = max(date),
+    days = n(),
+    years = n_distinct(year)
+  )
+```
+
+## Analysis
+
+The year is dry by several reasonable pre-monsoon cuts. The first half of May was the
+sharpest outlier: 3.38 mm, behind only 2020 and 1987 in this archive. Later rain between
+May 18 and May 23 moved May-to-date out of the deepest tail, but the year-to-date total
+is still third-lowest in the 1981-2026 comparison.
+
+```{r dryness-summary}
+historical_years <- 1981:2025
+all_years <- 1981:2026
+
+periods <- tribble(
+  ~period, ~start_md, ~end_md,
+  "Jan 1-May 23", "01-01", "05-23",
+  "Apr 1-May 23", "04-01", "05-23",
+  "May 1-May 15", "05-01", "05-15",
+  "May 1-May 23", "05-01", "05-23"
+)
+
+period_summary <- periods %>%
+  mutate(data = pmap(list(start_md, end_md), ~period_total(daily_weather, ..1, ..2, all_years))) %>%
+  select(period, data) %>%
+  unnest(data) %>%
+  group_by(period) %>%
+  mutate(
+    rank_low = rank(rain_mm, ties.method = "min"),
+    years_compared = n(),
+    historical_mean = mean(rain_mm[year <= 2025]),
+    historical_median = median(rain_mm[year <= 2025]),
+    deficit_vs_mean = rain_mm / historical_mean - 1
+  ) %>%
+  ungroup()
+
+period_summary %>%
+  filter(year == 2026) %>%
+  select(period, rain_mm, wet_days_1mm, rank_low, years_compared, historical_mean, historical_median, deficit_vs_mean) %>%
+  arrange(match(period, periods$period))
+```
+
+For the monsoon implication, I used June-September rainfall as the local southwest
+monsoon total and compared it with early-May rain in the same year. This is a deliberately
+simple test. If first-half May rain were a useful local predictor, the relationship should
+at least point in a stable direction.
+
+```{r monsoon-signal}
+early_may <- period_total(daily_weather, "05-01", "05-15", historical_years) %>%
+  rename(early_may_mm = rain_mm)
+
+monsoon <- period_total(daily_weather, "06-01", "09-30", historical_years) %>%
+  rename(monsoon_mm = rain_mm)
+
+signal <- early_may %>%
+  inner_join(monsoon, by = "year", suffix = c("_early", "_monsoon")) %>%
+  select(year, early_may_mm, monsoon_mm)
+
+signal_summary <- tibble(
+  pearson = cor(signal$early_may_mm, signal$monsoon_mm, method = "pearson"),
+  spearman = cor(signal$early_may_mm, signal$monsoon_mm, method = "spearman"),
+  low_early_may_threshold = quantile(signal$early_may_mm, 0.25),
+  low_monsoon_threshold = quantile(signal$monsoon_mm, 0.25),
+  high_monsoon_threshold = quantile(signal$monsoon_mm, 0.75)
+)
+
+signal_summary
+
+low_early_years <- signal %>%
+  filter(early_may_mm <= signal_summary$low_early_may_threshold) %>%
+  mutate(
+    monsoon_bucket = case_when(
+      monsoon_mm <= signal_summary$low_monsoon_threshold ~ "bottom quartile monsoon",
+      monsoon_mm >= signal_summary$high_monsoon_threshold ~ "top quartile monsoon",
+      TRUE ~ "middle half"
+    )
+  ) %>%
+  arrange(early_may_mm)
+
+low_early_years
+```
+
+## Chart
+
+```{r dryness-chart}
+dryness_chart_path <- file.path(chart_dir, "dry_may_2026_rainfall_rank.png")
+
+period_order <- c("Jan 1-May 23", "Apr 1-May 23", "May 1-May 15", "May 1-May 23")
+period_labels <- c(
+  "Jan 1-May 23" = "Year to May 23",
+  "Apr 1-May 23" = "Apr-May to May 23",
+  "May 1-May 15" = "First half of May",
+  "May 1-May 23" = "May to May 23"
+)
+
+dryness_plot_data <- period_summary %>%
+  mutate(
+    period = factor(period, levels = period_order),
+    focal = year == 2026,
+    label = if_else(
+      focal,
+      paste0("2026: ", round(rain_mm, 1), " mm\n#", rank_low, " driest of ", years_compared),
+      NA_character_
+    )
+  )
+
+dryness_medians <- dryness_plot_data %>%
+  filter(year <= 2025) %>%
+  summarise(median_rain = median(rain_mm), .by = period) %>%
+  mutate(period_y = as.numeric(period))
+
+dryness_chart <- ggplot(dryness_plot_data, aes(rain_mm, period)) +
+  geom_segment(
+    data = dryness_medians,
+    aes(
+      x = median_rain,
+      xend = median_rain,
+      y = period_y - 0.32,
+      yend = period_y + 0.32
+    ),
+    color = "#888888",
+    linewidth = 0.45
+  ) +
+  geom_point(
+    data = filter(dryness_plot_data, !focal),
+    color = "grey72",
+    size = 2.2,
+    alpha = 0.85
+  ) +
+  geom_point(
+    data = filter(dryness_plot_data, focal),
+    color = "#8F1D1D",
+    size = 3.2
+  ) +
+  geom_text_repel(
+    data = filter(dryness_plot_data, focal),
+    aes(label = label),
+    color = "#8F1D1D",
+    size = 3.1,
+    fontface = "bold",
+    nudge_x = 32,
+    direction = "y",
+    box.padding = 0.5,
+    segment.color = "#8F1D1D",
+    min.segment.length = 0
+  ) +
+  scale_x_continuous(labels = label_number(suffix = " mm"), expand = expansion(mult = c(0.02, 0.22))) +
+  scale_y_discrete(labels = period_labels) +
+  labs(
+    title = "Bangalore really is unusually dry so far in 2026",
+    subtitle = "Each grey dot is one year in the archive. Vertical lines mark the 1981-2025 median for that period.",
+    x = "Rainfall",
+    y = NULL,
+    caption = "Data: Bangalore daily weather archive, 1981-May 23 2026. Rainfall observed through May 23 for 2026."
+  ) +
+  theme_weather_question()
+
+dryness_chart
+
+ggsave(dryness_chart_path, dryness_chart, width = 12, height = 6, dpi = 180, bg = "white")
+```
+
+```{r signal-chart}
+signal_chart_path <- file.path(chart_dir, "early_may_rain_monsoon_signal.png")
+
+early_may_2026 <- period_summary %>%
+  filter(year == 2026, period == "May 1-May 15") %>%
+  pull(rain_mm)
+
+signal_labels <- signal %>%
+  filter(year %in% c(1987, 2020))
+
+signal_chart <- ggplot(signal, aes(early_may_mm, monsoon_mm)) +
+  annotate(
+    "rect",
+    xmin = -Inf,
+    xmax = signal_summary$low_early_may_threshold,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "#E5E1D8",
+    alpha = 0.45
+  ) +
+  geom_hline(yintercept = median(signal$monsoon_mm), color = "#888888", linewidth = 0.45) +
+  geom_vline(xintercept = early_may_2026, color = "#8F1D1D", linewidth = 0.65) +
+  geom_point(color = "#005566", size = 2.4, alpha = 0.85) +
+  geom_smooth(method = "lm", se = FALSE, color = "#666666", linewidth = 0.55, linetype = "dashed") +
+  geom_text_repel(
+    data = signal_labels,
+    aes(label = year),
+    color = "#3C3C3C",
+    size = 3,
+    fontface = "bold",
+    box.padding = 0.45,
+    segment.color = "grey55",
+    min.segment.length = 0
+  ) +
+  annotate(
+    "text",
+    x = early_may_2026,
+    y = max(signal$monsoon_mm) + 25,
+    label = "2026 first-half May",
+    color = "#8F1D1D",
+    fontface = "bold",
+    size = 3.2,
+    hjust = -0.05
+  ) +
+  scale_x_continuous(labels = label_number(suffix = " mm"), limits = c(0, NA)) +
+  scale_y_continuous(labels = label_number(suffix = " mm"), limits = c(280, 830)) +
+  labs(
+    title = "A dry first half of May does not predict the local monsoon very well",
+    subtitle = "1987 and 2020 both had almost no rain in early May, then went in opposite monsoon directions.",
+    x = "Rain from May 1-15",
+    y = "Rain from Jun 1-Sep 30",
+    caption = "Data: Bangalore daily weather archive, 1981-2025. Pearson r = -0.11; Spearman rho = -0.05."
+  ) +
+  theme_weather_question()
+
+signal_chart
+
+ggsave(signal_chart_path, signal_chart, width = 12, height = 6, dpi = 180, bg = "white")
+```
+
+## Checks
+
+- The dry-year finding is not sensitive to using Jan 1-May 23, Apr 1-May 23, or May 1-May 15; 2026 ranks third-driest in all three cuts.
+- The May-to-date rank is less extreme after May 18-May 23 rain: seventh-driest by May 23.
+- The monsoon signal stays weak whether using Pearson correlation, Spearman correlation, or the bottom-quartile early-May subset.
+- This does not use a dynamical monsoon model or circulation indices. It only tests the local historical relationship between Bangalore early-May rain and Bangalore June-September rain.
+
+## Verdict
+
+Insightful: yes
+
+The question clears the gate because it changes a plausible prior. Bangalore really has
+been unusually dry so far in 2026, but the obvious extension--that a dry first half of
+May is a bad local monsoon omen--does not hold up in the local archive. The closest
+historical analogs split in opposite directions, with 1987 followed by a dry monsoon and
+2020 followed by a wet one.
+
+Charts:
+
+- `docs/assets/analysis/dry_may_2026_rainfall_rank.png`
+- `docs/assets/analysis/early_may_rain_monsoon_signal.png`
+
+Blog post:
+
+- publish as `docs/blog/dry-may-monsoon-signal.html`
+- include `This post is AI-written.`
+- add original prompt at the end
+- add RSS and `analysis_questions/analyses.yml` entries

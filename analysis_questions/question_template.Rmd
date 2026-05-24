@@ -1,6 +1,7 @@
 ---
 title: "Question analysis template"
 question: "Replace with the weather question"
+trigger_prompt: "Paste the exact user prompt that triggered this workflow"
 slug: "replace-with-short-slug"
 date: "`r Sys.Date()`"
 analyst: "Codex"
@@ -168,5 +169,6 @@ Blog post:
 - not published
 - if this becomes insightful, create `docs/blog/<slug>.html`
 - include `This post is AI-written.` at the top of the article body
+- end with an `Original question` section containing `r rmarkdown::metadata$trigger_prompt`
 - add the post to the top of `docs/blog/index.html` and `docs/blog/feed.xml`
 - add `blog_url: "blog/<slug>.html"` to the top of `analysis_questions/analyses.yml`

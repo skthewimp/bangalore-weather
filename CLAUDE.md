@@ -15,3 +15,9 @@
 ## Project Structure
 *   **Historical Wind Scripts**: `fetch_historical_wind.R` and `fetch_historical_wind_direction.R` are one-off scripts used to pull 45-year chunks (1981-present). 
 *   **Updates**: Both `wind_speed` and `wind_direction` have now been integrated into `bangalore_weather_update.R` and `bangaloreWind.RData`.
+
+## Weather Question Workflow
+*   When a weather-related question is asked in this project, do not answer only from an ad hoc terminal summary unless the user explicitly asks for a quick answer only.
+*   Trigger the question-driven workflow in `analysis_questions/README.md`: create a notebook from `analysis_questions/question_template.Rmd`, run the analysis, write the `Verdict`, and decide whether it is insightful enough to publish.
+*   If the result is published as a blog post, the post must end with a short `Original question` section containing the exact prompt that triggered the workflow.
+*   After publishing, update `docs/blog/index.html`, `docs/blog/feed.xml`, `analysis_questions/analyses.yml`, and run `Rscript analysis_questions/update_site_analyses.R`.
