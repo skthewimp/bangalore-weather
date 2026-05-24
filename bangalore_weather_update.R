@@ -877,28 +877,131 @@ sitemap_xml <- paste0(
 writeLines(sitemap_xml, file.path(docs_dir, "sitemap.xml"))
 
 archive_summary_from_stats <- function(stats) {
-  rain_ratio <- ifelse(stats$annual_rain_avg > 0, stats$annual_rain_mm / stats$annual_rain_avg, 1)
-  wettest_ratio <- ifelse(stats$wettest_month_avg > 0, stats$wettest_month_mm / stats$wettest_month_avg, 1)
+  bad_archive_summary_text <- function(text) {
+    str_detect(
+      str_to_lower(text),
+      "\\b(strong|surge|peak|heavy|big|flood|steady|normal year|near normal|above normal)\\b|;|\\bwet year, wet\\b|\\bdry year, dry\\b"
+    )
+  }
 
-  if (rain_ratio >= 1.2 && wettest_ratio >= 1.8) {
-    return(paste("Wet year,", stats$wettest_month, "surge"))
+  has_temperature_phrase <- function(text) {
+    str_detect(
+      str_to_lower(text),
+      "\\b(record heat|hot year|warm nights|no hot days|cool year|mild year|many records|record days)\\b"
+    )
   }
-  if (rain_ratio >= 1.2) {
-    return(paste("Wet year, strong", stats$wettest_month))
+
+  has_rain_phrase <- function(text) {
+    str_detect(
+      str_to_lower(text),
+      "\\b(wet year|dry year|wet [a-z]+|dry [a-z]+|rainy [a-z]+|weak monsoon|wet monsoon|long dry spell|modest rain|[a-z]+ rain)\\b"
+    )
   }
-  if (rain_ratio <= 0.85 && stats$longest_dry_spell >= 45) {
-    return(paste("Dry year,", paste0(stats$longest_dry_spell, "-day dry spell")))
+
+  clean_archive_summary <- function(text) {
+    text %>%
+      normalize_commentary_text() %>%
+      str_replace_all("^[-*•\\s]+", "") %>%
+      str_replace_all("[\"']", "") %>%
+      str_squish()
   }
-  if (rain_ratio <= 0.85) {
-    return(paste("Dry year,", stats$wettest_month, "peak"))
+
+  stats_text <- paste(
+    paste0("Year: ", stats$year),
+    paste0("Annual rain: ", stats$annual_rain_mm, " mm vs usual ", stats$annual_rain_avg, " mm"),
+    paste0("Monsoon rain: ", stats$monsoon_mm, " mm vs usual ", stats$monsoon_avg, " mm"),
+    paste0("Wettest month: ", stats$wettest_month, " ", stats$wettest_month_mm, " mm vs usual ", stats$wettest_month_avg, " mm"),
+    paste0("Driest notable month: ", stats$driest_month, " ", stats$driest_month_mm, " mm vs usual ", stats$driest_month_avg, " mm"),
+    paste0("Hot days: ", stats$hot_days, " vs usual ", stats$hot_days_avg, " above ", stats$hot_day_thresh, "°C"),
+    paste0("Cold days: ", stats$cold_days, " vs usual ", stats$cold_days_avg, " below ", stats$cold_day_thresh, "°C"),
+    paste0("Record-breaking calendar-date days: ", stats$record_breaking_days),
+    paste0("Longest dry spell: ", stats$longest_dry_spell, " days, ", stats$dry_spell_period),
+    paste0("Longest wet spell: ", stats$longest_wet_spell, " days, ", stats$wet_spell_period),
+    sep = "\n"
+  )
+
+  request_archive_summary <- function(retry_note = NULL) {
+    body <- list(
+      model = "claude-haiku-4-5-20251001",
+      max_tokens = 80,
+      system = paste0(
+        "You write a tiny archive label for a Bangalore yearly weather chart. ",
+        "Output exactly one phrase with two comma-separated parts, 3-7 words total. ",
+        "One part must be about temperature and one part must be about rain. Either order is fine. ",
+        "Use concrete, plain wording a resident can understand. Good examples: ",
+        "'Record heat, wet August', 'Wet year, no hot days', 'Dry year, long dry spell', 'Hot year, June rain'. ",
+        "Prefer clear temperature categories: record heat, hot year, warm nights, no hot days, cool year. ",
+        "Prefer clear rain categories: wet year, dry year, wet/dry month name, weak monsoon, long dry spell. ",
+        "Do not make both parts about rain. Avoid labels like 'Wet year, wet November' or 'Dry year, dry May'. ",
+        "Do not use vague or weird phrases such as strong July, November surge, September-heavy, August peak, big July, steady rain, near normal, above normal. ",
+        "Do not use dramatic unsupported words such as flood. ",
+        "Do not include numbers unless it is a dry-spell length. ",
+        "No bullets, no explanation, no year."
+      ),
+      messages = list(
+        list(
+          role = "user",
+          content = paste0(
+            "Computed stats for the year:\n",
+            stats_text,
+            if (!is.null(retry_note) && nzchar(retry_note)) paste0("\n\nRETRY NOTE\n", retry_note) else ""
+          )
+        )
+      )
+    )
+
+    resp <- request("https://api.anthropic.com/v1/messages") %>%
+      req_headers(
+        `x-api-key` = Sys.getenv("ANTHROPIC_API_KEY"),
+        `anthropic-version` = "2023-06-01",
+        `content-type` = "application/json"
+      ) %>%
+      req_body_json(body) %>%
+      req_timeout(30) %>%
+      perform_claude_request_with_retries()
+
+    if (resp_status(resp) != 200) {
+      stop("Claude API returned status ", resp_status(resp), " while generating archive summary for ", stats$year, ".")
+    }
+
+    resp %>%
+      resp_body_json() %>%
+      .$content %>%
+      .[[1]] %>%
+      .$text %>%
+      clean_archive_summary()
   }
-  if (stats$record_breaking_days >= 25) {
-    return("Many records, near-normal rain")
+
+  candidate <- NULL
+  last_error <- NULL
+  for (attempt in seq_len(3)) {
+    retry_note <- if (attempt == 1 || is.null(last_error)) {
+      NULL
+    } else {
+      paste0("Previous phrase was rejected: ", last_error, ". Rewrite with one temperature phrase and one rain phrase.")
+    }
+
+    candidate <- request_archive_summary(retry_note)
+    last_error <- if (!str_detect(candidate, "^[A-Za-z0-9 -]+, [A-Za-z0-9 -]+$")) {
+      paste0("invalid shape: ", candidate)
+    } else if (str_count(candidate, "\\S+") > 7) {
+      paste0("too long: ", candidate)
+    } else if (bad_archive_summary_text(candidate)) {
+      paste0("vague wording: ", candidate)
+    } else if (!has_temperature_phrase(candidate) || !has_rain_phrase(candidate)) {
+      paste0("missing one temperature phrase and one rain phrase: ", candidate)
+    } else {
+      NULL
+    }
+
+    if (is.null(last_error)) break
   }
-  if (stats$hot_days > stats$hot_days_avg * 1.4) {
-    return(paste("Hot year,", stats$wettest_month, "rain"))
+
+  if (!is.null(last_error)) {
+    stop("Archive summary failed validation for ", stats$year, ": ", last_error)
   }
-  paste("Near normal,", stats$wettest_month, "rain")
+
+  candidate
 }
 
 publish_completed_year_archive <- function() {
