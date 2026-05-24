@@ -162,3 +162,11 @@ This template does not answer a real question yet. Do not add it to the site.
 Charts:
 
 - none
+
+Blog post:
+
+- not published
+- if this becomes insightful, create `docs/blog/<slug>.html`
+- include `This post is AI-written.` at the top of the article body
+- add the post to `docs/blog/feed.xml`
+- add `blog_url: "blog/<slug>.html"` to `analysis_questions/analyses.yml`

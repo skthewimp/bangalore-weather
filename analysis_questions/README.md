@@ -16,21 +16,21 @@ local Bangalore weather data.
    table, make at least one chart if the answer is visual, and write public charts to
    `docs/assets/analysis/`.
 4. Decide whether the result is worth keeping around. Be strict.
-5. Only if the result is genuinely insightful, add an entry to `analyses.yml` with
-   `insightful: true` and `publish: true`.
-6. Run:
+5. Only if the result is genuinely insightful, write a blog post in `docs/blog/`.
+   Keep it around 400 words, include a few relevant charts/images, and put
+   `This post is AI-written.` at the top of the article body.
+6. Add the post to `docs/blog/feed.xml`.
+7. Add an entry to `analyses.yml` with `insightful: true`, `publish: true`, and
+   `blog_url: "blog/<slug>.html"`.
+8. Run:
 
 ```bash
 Rscript analysis_questions/update_site_analyses.R
 ```
 
 This rewrites the homepage blog cards in `docs/index.html` from `analyses.yml`.
-If an entry has a `blog_url`, the card points readers to the post instead of directly
-to the chart.
-
-Published blog posts live in `docs/blog/`. Keep the visible disclosure
-`This post is AI-written.` at the top of every post, and add each new post to
-`docs/blog/feed.xml`.
+Published, insightful entries must have a `blog_url`; the updater fails if the blog
+post is missing, lacks the AI-written disclosure, or is absent from `docs/blog/feed.xml`.
 
 ## Insightfulness Gate
 
@@ -53,6 +53,7 @@ Each notebook should end with a `Verdict` section containing:
 - the answer in 2-4 sentences
 - the reason it should or should not be added to the site
 - the chart filenames, if any
+- if published, the blog post path and RSS entry status
 
-The public site gets only the polished chart and short summary. The notebook keeps the
-messy reasoning, checks, thresholds, and false starts.
+The public site gets the polished chart, short homepage summary, and blog post. The
+notebook keeps the messy reasoning, checks, thresholds, and false starts.

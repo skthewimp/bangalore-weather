@@ -15,6 +15,8 @@ script_dir <- tryCatch({
 root_dir <- normalizePath(file.path(script_dir, ".."))
 registry_path <- file.path(script_dir, "analyses.yml")
 index_path <- file.path(root_dir, "docs", "index.html")
+blog_feed_path <- file.path(root_dir, "docs", "blog", "feed.xml")
+site_url <- "https://weather.karthiks.co/"
 
 escape_html <- function(x) {
   x <- gsub("&", "&amp;", x, fixed = TRUE)
@@ -45,7 +47,7 @@ render_links <- function(links) {
 render_item <- function(item) {
   width <- item$image_width %||% ""
   height <- item$image_height %||% ""
-  post_href <- item$blog_url %||% item$image
+  post_href <- item$blog_url
 
   c(
     '        <article class="analysis-item">',
@@ -82,13 +84,35 @@ if (length(published) == 0) {
   stop("No analyses have both publish: true and insightful: true.")
 }
 
-missing_fields <- c("slug", "title", "summary", "image")
+missing_fields <- c("slug", "title", "summary", "image", "blog_url")
 for (item in published) {
   missing <- missing_fields[vapply(missing_fields, function(field) {
     is.null(item[[field]]) || !nzchar(as.character(item[[field]]))
   }, logical(1))]
   if (length(missing) > 0) {
     stop("Analysis entry is missing required fields: ", paste(missing, collapse = ", "))
+  }
+
+  blog_path <- file.path(root_dir, "docs", item$blog_url)
+  if (!file.exists(blog_path)) {
+    stop("Analysis entry '", item$slug, "' points to missing blog post: ", item$blog_url)
+  }
+
+  blog_html <- paste(readLines(blog_path, warn = FALSE), collapse = "\n")
+  if (!grepl("This post is AI-written.", blog_html, fixed = TRUE)) {
+    stop("Blog post for analysis entry '", item$slug, "' is missing the AI-written disclosure.")
+  }
+}
+
+if (!file.exists(blog_feed_path)) {
+  stop("Missing blog RSS feed: docs/blog/feed.xml")
+}
+
+blog_feed <- paste(readLines(blog_feed_path, warn = FALSE), collapse = "\n")
+for (item in published) {
+  absolute_blog_url <- paste0(site_url, item$blog_url)
+  if (!grepl(absolute_blog_url, blog_feed, fixed = TRUE)) {
+    stop("Blog RSS feed is missing analysis entry '", item$slug, "': ", absolute_blog_url)
   }
 }
 
