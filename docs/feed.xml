@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Bangalore Weather</title>
     <link>https://weather.karthiks.co/</link>
@@ -7,9 +7,10 @@
     <item>
       <title>Bangalore's Weather in 2026</title>
       <link>https://weather.karthiks.co/</link>
-      <guid>https://weather.karthiks.co/archive/bangalore_weather_20260524.png</guid>
-      <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
-      <description>May remains almost dry at just 34% of normal rainfall through May 23 Warm nights persist 1-2°C above normal across the entire two weeks Mid-May rain spike on May 18 brought only brief relief to the deficit</description>
+      <guid>https://weather.karthiks.co/archive/bangalore_weather_20260703.png</guid>
+      <pubDate>Fri, 03 Jul 2026 00:00:00 GMT</pubDate>
+      <description>Last 14 days brought 38% less rain than normal despite 12 rainy days Warm nights stuck around, averaging 0.6°C above normal throughout the spell Jun 27-28 saw highs spike 2.7°C above normal on back-to-back days</description>
+      <content:encoded><![CDATA[<p><img src="https://weather.karthiks.co/assets/latest.png" alt="Bangalore's Weather in 2026"></p><ul><li>Last 14 days brought 38% less rain than normal despite 12 rainy days</li><li>Warm nights stuck around, averaging 0.6°C above normal throughout the spell</li><li>Jun 27-28 saw highs spike 2.7°C above normal on back-to-back days</li></ul><p><a href="https://weather.karthiks.co/archive/bangalore_weather_20260703.png">Open archived chart</a></p>]]></content:encoded>
     </item>
   </channel>
 </rss>

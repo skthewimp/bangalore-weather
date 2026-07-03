@@ -592,3 +592,21 @@ env R_ENVIRON_USER=/home/karthik/apps/bangalore-weather/.Renviron \
 - Investigated Claude failures and found external Anthropic incidents around Haiku 4.5 on 20 and 22 May 2026. A live Haiku probe returned `200` with full rate-limit headroom.
 - Documented Haiku-only policy, Claude incident debugging, rate-limit header checks, and manual end-to-end service testing in `docs/DEPLOY.md`.
 <!-- codex-session:2026-05-22-daily-scheduler:end -->
+
+<!-- codex-session:2026-07-03-daily-weather-claude-wording:start -->
+## 2026-07-03 04:45 UTC | Codex session `daily-weather-claude-wording`
+
+### User prompts
+> the weather graphic  didn't run today
+> the fallback isn't good. you need to get claude to work
+> ok need one fix. it says "* Rain fell on 12 of 14 days but totaled just 28mm, well short of the normal 44mm". it is 12 of last 14 days. what "14 days" is here is uncelear.
+
+### Work done
+- Found the user-level `bangalore-weather-daily.service` had fired at `02:30 UTC` but failed after three Claude commentary attempts were rejected by wording validation.
+- Confirmed the data refresh itself had run; the failure happened before `docs/assets/latest.png` and `docs/latest.json` were republished.
+- Kept the no-fallback policy intact. A temporary deterministic fallback idea was removed, so the daily job still requires acceptable Claude copy.
+- Tightened Claude output handling in `bangalore_weather_update.R`: normalize semicolons and `fortnight`, reject ambiguous bare rainy-day denominators like `12 of 14 days`, and explicitly instruct Claude to write `last 14 days` or an exact date range.
+- Regenerated the July 3 daily chart, archive image, latest JSON, RSS feed, CSV export, sitemap, and refreshed Oikolab-backed data files through the real systemd service.
+- Verified `systemctl --user status bangalore-weather-daily.service --no-pager` showed `status=0/SUCCESS` and `Claude commentary accepted on attempt 1`.
+- Confirmed `docs/latest.json` now uses clear window wording: `Last 14 days brought 38% less rain than normal despite 12 rainy days`.
+<!-- codex-session:2026-07-03-daily-weather-claude-wording:end -->

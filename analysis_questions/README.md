@@ -8,6 +8,51 @@ questions asked in chat. A quick inline answer is fine only when the user explic
 asks for one. Otherwise, create the notebook, run the checks, and make the
 publish/no-publish decision in the repo.
 
+## Skill Use
+
+When available, use these skills as part of the workflow:
+
+1. `karthik-analysis-planner` for operational definitions, denominators,
+   comparison frame, caveats, and falsification checks.
+2. `dataviz-orchestrator` for loose exploratory questions where the work needs
+   the full loop from analysis contract to rendered visual story.
+3. `weather-question-analysis` for the repo-local notebook/verdict/publishing
+   workflow.
+4. `dataviz-selector` before choosing chart forms.
+5. `karthik-data-visualization` before finalizing chart code or exported charts.
+6. `dataviz-critique` after rendering charts, before treating a chart as
+   publication-ready.
+7. `karthik-writing-style` for public blog-post prose.
+
+## Hermes Draft Mode
+
+When a question arrives through Hermes using `/weather_question` or
+`/weather-question`, run only the draft half of the workflow:
+
+1. Create and run the notebook.
+2. Write the `Verdict`.
+3. Create analysis charts if needed.
+4. Reply in Hermes with the gist, the insightfulness verdict, and the files created.
+5. If the result is publishable, ask for explicit approval with
+   `/weather_publish <slug>`.
+
+In Hermes draft mode, do not create or edit `docs/blog/`, `docs/index.html`,
+`docs/blog/feed.xml`, or `analysis_questions/analyses.yml`. Do not commit or push.
+
+## Hermes Approved Publish Mode
+
+When the user replies with `/weather_publish <slug>` or `/weather-publish <slug>`,
+publish only the named completed analysis:
+
+1. Confirm the notebook exists and its `Verdict` says `Insightful: yes`.
+2. Create or finalize the blog post in `docs/blog/`.
+3. Update `analysis_questions/analyses.yml`, `docs/blog/index.html`, and
+   `docs/blog/feed.xml`.
+4. Run `Rscript analysis_questions/update_site_analyses.R`.
+5. Verify the generated files.
+6. Commit the relevant changes and push.
+7. Report the published URL and commit hash back to Hermes.
+
 ## Process
 
 1. Copy `question_template.Rmd` to a new notebook in this directory.

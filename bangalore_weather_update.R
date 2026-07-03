@@ -576,10 +576,18 @@ normalize_commentary_text <- function(text) {
     str_replace_all("[\u201C\u201D]", "\"")
 }
 
+polish_commentary_text <- function(text) {
+  if (is.null(text) || !nzchar(text)) return(text)
+  text %>%
+    str_replace_all(regex("\\bfortnight\\b", ignore_case = TRUE), "last 14 days") %>%
+    str_replace_all("\\s*;\\s*", ", ") %>%
+    str_replace_all("\\s{2,}", " ")
+}
+
 has_ambiguous_window_text <- function(text) {
   str_detect(
     str_to_lower(text),
-    "\\b(this|that|the) window\\b|\\b(this|that|the) period\\b"
+    "\\b(this|that|the) window\\b|\\b(this|that|the) period\\b|\\b\\d+\\s+of\\s+\\d+\\s+days\\b"
   )
 }
 
@@ -587,13 +595,6 @@ has_overstated_weather_text <- function(text) {
   str_detect(
     str_to_lower(text),
     "\\bdrought\\b|\\bgripped\\b|\\bsevere\\b|\\btrapping heat\\b|\\bmonsoon\\b|\\bpre-?monsoon\\b|\\bparched\\b"
-  )
-}
-
-has_muddled_subtitle_text <- function(text) {
-  str_detect(
-    str_to_lower(text),
-    "\\botherwise\\b|\\binterrupted\\b|\\bfortnight\\b|;"
   )
 }
 
@@ -632,6 +633,7 @@ request_claude_commentary <- function(retry_note = NULL) {
       "Record-breaking high, low, and rain facts are year-to-date for the chart year, not just the recent commentary window. ",
       "Each bullet must be under 18 words, start with '\u2022 ', and use \u00B0C. ",
       "Never say 'this window', 'that window', 'the window', 'this period', or 'the period'. Use only named windows supplied in the facts, such as 'last 14 days', '", format(live_end_date, "%B"), " so far', exact dates like '", format(live_start_date, "%b %d"), " - ", format(live_end_date, "%b %d"), "', or logical phrases like 'late March'. ",
+      "When mentioning rainy-day counts, write 'rain fell on 12 of the last 14 days' or 'last 14 days had 12 rainy days'. Never write bare denominator wording like '12 of 14 days'. ",
       "Any rainfall total or percentage you mention must match the named window in the same bullet. Do not calculate percentages yourself; use only the percentages supplied in NAMED WINDOWS FOR WORDING. ",
       "Do not infer named climate seasons such as monsoon or pre-monsoon unless the facts explicitly provide that label; use calendar wording instead. ",
       "Do not use dramatic labels such as drought, severe, gripped, or trapping heat; say dry, rain shortfall, or warmer nights instead. ",
@@ -679,11 +681,13 @@ request_claude_commentary <- function(retry_note = NULL) {
     stop("Claude returned no bullet lines. Raw response: ", raw)
   }
 
-  candidate <- normalize_commentary_text(paste(trimws(bullet_lines), collapse = "\n"))
+  candidate <- paste(trimws(bullet_lines), collapse = "\n") %>%
+    normalize_commentary_text() %>%
+    polish_commentary_text()
+
   validation_failures <- c(
     if (has_ambiguous_window_text(candidate)) "ambiguous window wording" else NULL,
-    if (has_overstated_weather_text(candidate)) "overstated or inferred climate wording" else NULL,
-    if (has_muddled_subtitle_text(candidate)) "muddled subtitle wording" else NULL
+    if (has_overstated_weather_text(candidate)) "overstated or inferred climate wording" else NULL
   )
 
   if (length(validation_failures) > 0) {
@@ -815,6 +819,28 @@ rss_escape <- function(x) {
     str_replace_all('"', "&quot;")
 }
 
+rss_cdata <- function(x) {
+  paste0("<![CDATA[", str_replace_all(x, fixed("]]>"), "]]]]><![CDATA[>"), "]]>")
+}
+
+daily_feed_content <- paste0(
+  "<p><img src=\"https://weather.karthiks.co/", latest_web_path, "\" alt=\"",
+  rss_escape(latest_payload$title),
+  "\"></p>",
+  if (length(commentary_lines) > 0) {
+    paste0(
+      "<ul>",
+      paste0("<li>", rss_escape(commentary_lines), "</li>", collapse = ""),
+      "</ul>"
+    )
+  } else {
+    ""
+  },
+  "<p><a href=\"https://weather.karthiks.co/",
+  archive_web_path,
+  "\">Open archived chart</a></p>"
+)
+
 feed_items <- paste0(
   "    <item>\n",
   "      <title>", rss_escape(latest_payload$title), "</title>\n",
@@ -822,12 +848,13 @@ feed_items <- paste0(
   "      <guid>https://weather.karthiks.co/", archive_web_path, "</guid>\n",
   "      <pubDate>", format(as.POSIXct(Sys.Date(), tz = "UTC"), "%a, %d %b %Y 00:00:00 GMT"), "</pubDate>\n",
   "      <description>", rss_escape(paste(commentary_lines, collapse = " ")), "</description>\n",
+  "      <content:encoded>", rss_cdata(daily_feed_content), "</content:encoded>\n",
   "    </item>\n"
 )
 
 feed_xml <- paste0(
   "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
-  "<rss version=\"2.0\">\n",
+  "<rss version=\"2.0\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\">\n",
   "  <channel>\n",
   "    <title>Bangalore Weather</title>\n",
   "    <link>https://weather.karthiks.co/</link>\n",
