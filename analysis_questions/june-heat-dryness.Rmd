@@ -1,0 +1,275 @@
+---
+title: "Was June unusually hot, and was dryness part of it?"
+question: "Was this an unusually hot June? did it have anyting to do with the dryness?"
+trigger_prompt: "Was this an unusually hot June? did it have anyting to do with the dryness?"
+slug: "june-heat-dryness"
+date: "`r Sys.Date()`"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 160
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+
+theme_weather_question <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+      axis.title = element_blank(),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      legend.position = "none"
+    )
+}
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+I treat this as an ERA5-only Bangalore archive check: was June 2026 actually unusual on temperature, and if so, was that mainly because it was dry?
+
+## Data prep
+
+```{r data-prep}
+june_daily <- blrTemp %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    temp_c = as.numeric(Temp)
+  ) %>%
+  filter(!is.na(temp_c), month == 6) %>%
+  summarise(
+    tmax = max(temp_c, na.rm = TRUE),
+    tmean = mean(temp_c, na.rm = TRUE),
+    .by = c(date, year)
+  ) %>%
+  left_join(
+    blrRain %>%
+      transmute(
+        DT = as_datetime(DT),
+        date = as_date(DT),
+        year = year(DT),
+        month = month(DT),
+        rain_mm = as.numeric(Rain)
+      ) %>%
+      filter(!is.na(rain_mm), month == 6) %>%
+      summarise(rain_mm = sum(rain_mm, na.rm = TRUE), .by = c(date, year)),
+    by = c("date", "year")
+  ) %>%
+  filter(is.finite(tmax), !is.na(rain_mm)) %>%
+  mutate(rainy = rain_mm > 0.1)
+
+june_yearly <- june_daily %>%
+  summarise(
+    june_tmax_mean = mean(tmax),
+    june_tmax_median = median(tmax),
+    june_tmax_p90 = quantile(tmax, 0.9),
+    june_rain_total = sum(rain_mm),
+    hot30 = sum(tmax >= 30),
+    hot31 = sum(tmax >= 31),
+    hot32 = sum(tmax >= 32),
+    hot33 = sum(tmax >= 33),
+    rainy_days = sum(rainy),
+    dry_days = sum(!rainy),
+    .by = year
+  ) %>%
+  mutate(
+    temp_rank = rank(-june_tmax_mean, ties.method = "min"),
+    rain_rank = rank(june_rain_total, ties.method = "min")
+  )
+
+this_year <- june_yearly %>% filter(year == 2026)
+archive_years <- june_yearly %>% filter(year <= 2025)
+
+archive_summary <- june_yearly %>%
+  summarise(
+    mean_tmax = mean(june_tmax_mean),
+    sd_tmax = sd(june_tmax_mean),
+    mean_rain = mean(june_rain_total),
+    sd_rain = sd(june_rain_total),
+    corr_tmax_rain = cor(june_tmax_mean, june_rain_total),
+    mean_hot31 = mean(hot31),
+    mean_hot32 = mean(hot32),
+    mean_hot33 = mean(hot33)
+  )
+
+archive_summary
+this_year
+june_daily %>%
+  filter(year == 2026) %>%
+  arrange(desc(tmax)) %>%
+  select(date, tmax, rain_mm) %>%
+  mutate(
+    tmax = round(tmax, 2),
+    rain_mm = round(rain_mm, 2)
+  )
+```
+
+## Was June unusually hot?
+
+```{r june-rank-table}
+june_yearly %>%
+  filter(year == 2026) %>%
+  transmute(
+    year,
+    june_tmax_mean = round(june_tmax_mean, 2),
+    june_rain_total = round(june_rain_total, 1),
+    temp_rank,
+    rain_rank,
+    hot31,
+    hot32,
+    hot33,
+    rainy_days,
+    dry_days
+  )
+```
+
+June 2026 was warm, but not a standout heatwave month. Its mean daily maximum temperature was a bit above the archive average, but only enough to land around the middle-upper part of the ranking rather than near the top. The month had plenty of rain days and a rainfall total that was close to the archive middle, so it does *not* look like a sharply dry June that happened to run hot.
+
+## Did dryness explain the heat?
+
+```{r rain-temp-check}
+trend_note <- tibble(
+  metric = c(
+    "Correlation across June years",
+    "2026 mean daily max temp",
+    "2026 June rainfall total"
+  ),
+  value = c(
+    archive_summary$corr_tmax_rain,
+    this_year$june_tmax_mean,
+    this_year$june_rain_total
+  )
+)
+
+trend_note
+```
+
+Across the full June archive, the temperature-rainfall link is weakly negative: drier Junes do tend to be a little warmer on average, but the effect is small. June 2026 itself sits near the middle of the rainfall distribution, so there is no strong sign that the warmth was driven by an unusually dry month. In other words: dryness may have nudged the temperature upward a bit, but it is not the main story here.
+
+## Chart
+
+```{r tmax-chart}
+tmax_chart_path <- file.path(chart_dir, "june-heat-dryness-tmax-trend.png")
+
+p1 <- ggplot(june_yearly, aes(year, june_tmax_mean)) +
+  geom_hline(yintercept = archive_summary$mean_tmax, color = "#B8B8B8", linewidth = 0.5, linetype = "dashed") +
+  geom_line(color = "#7A8B8C", linewidth = 0.7) +
+  geom_point(color = "#7A8B8C", size = 1.8) +
+  geom_point(data = this_year, color = "#8F1D1D", size = 3.2) +
+  geom_label(
+    data = this_year,
+    aes(label = paste0("2026\n", round(june_tmax_mean, 2), "°C\n#", temp_rank, " of ", nrow(june_yearly))),
+    nudge_y = 0.16,
+    size = 3.4,
+    label.size = 0.25,
+    fill = "white",
+    color = "#8F1D1D"
+  ) +
+  scale_y_continuous(labels = label_number(accuracy = 0.1, suffix = "°C")) +
+  labs(
+    title = "June 2026 was warm, but not extreme",
+    subtitle = "Mean daily maximum temperature by June, with the 2026 point highlighted",
+    caption = "Hourly ERA5 archive for Bangalore; June only"
+  ) +
+  theme_weather_question()
+
+p1
+
+ggsave(tmax_chart_path, p1, width = 12, height = 6, dpi = 180, bg = "white")
+```
+
+```{r rain-chart}
+rain_chart_path <- file.path(chart_dir, "june-heat-dryness-rain-scatter.png")
+
+p2 <- ggplot(june_yearly, aes(june_rain_total, june_tmax_mean)) +
+  geom_smooth(method = "lm", se = FALSE, color = "#C58A3A", linewidth = 0.8) +
+  geom_point(color = "grey72", size = 2.1) +
+  geom_point(data = this_year, color = "#8F1D1D", size = 3.2) +
+  geom_label(
+    data = this_year,
+    aes(label = paste0("2026\n", round(june_rain_total, 0), " mm / ", round(june_tmax_mean, 2), "°C")),
+    nudge_x = 10,
+    nudge_y = 0.05,
+    size = 3.3,
+    label.size = 0.25,
+    fill = "white",
+    color = "#8F1D1D"
+  ) +
+  scale_x_continuous(labels = label_number(suffix = " mm")) +
+  scale_y_continuous(labels = label_number(accuracy = 0.1, suffix = "°C")) +
+  labs(
+    title = "Drier Junes are a little warmer, but only weakly so",
+    subtitle = paste0("Across June years, rain and heat have a small negative relationship (r = ", round(archive_summary$corr_tmax_rain, 2), ")"),
+    caption = "Hourly ERA5 archive for Bangalore; June totals by year"
+  ) +
+  theme_weather_question()
+
+p2
+
+ggsave(rain_chart_path, p2, width = 12, height = 6, dpi = 180, bg = "white")
+```
+
+## Checks
+
+```{r checks}
+june_yearly %>%
+  filter(year == 2026) %>%
+  select(year, june_tmax_mean, june_rain_total, temp_rank, rain_rank, hot30, hot31, hot32, hot33, rainy_days, dry_days)
+
+june_daily %>%
+  filter(year == 2026) %>%
+  summarise(
+    days = n(),
+    mean_tmax = mean(tmax),
+    mean_rain = mean(rain_mm),
+    rainy_share = mean(rainy),
+    corr_daily = cor(tmax, rain_mm)
+  )
+```
+
+## Verdict
+
+Insightful: no
+
+June 2026 was somewhat warm, but it was not an unusually hot June in the archive: the temperature rank is only moderately high, not exceptional. The dryness link is also weak — June rainfall was close to normal, and the month-level temperature/rain relationship is small enough that I would not treat dryness as the main explanation. This is a useful descriptive check, but not strong enough to publish.
+
+Charts:
+
+- `docs/assets/analysis/june-heat-dryness-tmax-trend.png`
+- `docs/assets/analysis/june-heat-dryness-rain-scatter.png`
+
+Blog post:
+
+- not published

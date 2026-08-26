@@ -1,0 +1,366 @@
+---
+title: "Has July ever been this hot before?"
+question: "Has July ever been this hot before, and what has hot July meant for overall seasonal (Jul-Sep) rainfall?"
+trigger_prompt: "has July ever been this hot before? and hwat has hot July meant for overall seasonal (jul-sep) rainfall?"
+slug: "july-hot-rainfall"
+date: "`r Sys.Date()`"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 160
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(patchwork)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+
+analysis_date <- max(as_datetime(blrTemp$DT), na.rm = TRUE) |> as_date()
+current_year <- year(analysis_date)
+cutoff_day <- day(analysis_date)
+
+theme_weather_question <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+      axis.title = element_blank(),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      legend.position = "none"
+    )
+}
+
+fmt_rank <- function(x, n) paste0(x, " / ", n)
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Analysis frame
+
+- *July heat* is measured two ways:
+  1. July 1-15 mean daily maximum temperature, to compare the current month-to-date heat fairly against past Julys at the same point in the month.
+  2. Full-month July mean daily maximum temperature, to test whether a hot July has historically meant a wetter or drier Jul-Sep season.
+- *Seasonal rainfall* means total rain in July-September of the same year.
+- Data source is the local ERA5 archive only.
+
+## Data prep
+
+```{r data-prep}
+temp_hourly <- blrTemp %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    day = day(DT),
+    temp_c = as.numeric(Temp)
+  ) %>%
+  filter(!is.na(temp_c))
+
+rain_hourly <- blrRain %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    day = day(DT),
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  filter(!is.na(rain_mm))
+
+daily_weather <- temp_hourly %>%
+  summarise(
+    tmin = min(temp_c, na.rm = TRUE),
+    tmax = max(temp_c, na.rm = TRUE),
+    tmean = mean(temp_c, na.rm = TRUE),
+    .by = c(date, year, month, day)
+  ) %>%
+  left_join(
+    rain_hourly %>%
+      summarise(rain_mm = sum(rain_mm, na.rm = TRUE), .by = c(date, year, month, day)),
+    by = c("date", "year", "month", "day")
+  ) %>%
+  filter(is.finite(tmin), is.finite(tmax), !is.na(rain_mm))
+
+daily_weather %>%
+  summarise(
+    first_date = min(date),
+    last_date = max(date),
+    days = n(),
+    years = n_distinct(year)
+  )
+```
+
+## July so far: is this already an unusually hot July?
+
+```{r july-ytd-metrics}
+july_ytd <- daily_weather %>%
+  filter(month == 7, day <= cutoff_day) %>%
+  summarise(
+    mean_tmax = mean(tmax),
+    mean_tmin = mean(tmin),
+    mean_tmean = mean(tmean),
+    days_30 = sum(tmax >= 30),
+    days_31 = sum(tmax >= 31),
+    days_32 = sum(tmax >= 32),
+    days_33 = sum(tmax >= 33),
+    days_35 = sum(tmax >= 35),
+    max_tmax = max(tmax),
+    rain_total = sum(rain_mm),
+    rainy_days = sum(rain_mm > 0.1),
+    .by = year
+  ) %>%
+  mutate(
+    rank_mean_tmax = min_rank(desc(mean_tmax)),
+    rank_max_tmax = min_rank(desc(max_tmax)),
+    rank_days_33 = min_rank(desc(days_33))
+  )
+
+current_ytd <- july_ytd %>% filter(year == current_year)
+current_ytd
+
+thresholds_ytd <- july_ytd %>%
+  summarise(
+    across(c(days_30, days_31, days_32, days_33, days_35), list(mean = mean, max = max))
+  )
+
+thresholds_ytd
+```
+
+```{r july-ytd-ranks}
+july_ytd %>%
+  arrange(desc(mean_tmax)) %>%
+  select(year, mean_tmax, mean_tmin, days_30, days_31, days_32, days_33, days_35, max_tmax, rain_total) %>%
+  slice(1:8)
+```
+
+The current July is **hot, but not the hottest July 1-15 in the archive**. It ranks fourth on mean daily maximum temperature over the first 15 days. What is more extreme is the *single-day* heat: the hottest day so far is the hottest July 1-15 day in the archive, and there is already one day at or above 33°C.
+
+```{r july-ytd-summary}
+current_ytd %>%
+  transmute(
+    year,
+    mean_tmax = round(mean_tmax, 2),
+    mean_tmin = round(mean_tmin, 2),
+    max_tmax = round(max_tmax, 2),
+    days_30, days_31, days_32, days_33, days_35,
+    rain_total = round(rain_total, 2),
+    rainy_days,
+    rank_mean_tmax,
+    rank_max_tmax,
+    rank_days_33
+  )
+```
+
+## Chart 1: July 1-15 heat through time
+
+```{r chart-ytd, fig.width=12, fig.height=6.5}
+ytd_plot_data <- july_ytd %>%
+  mutate(
+    label = if_else(year == current_year, paste0(year, "  ", round(mean_tmax, 2), "°C"), NA_character_)
+  )
+
+record_ytd <- july_ytd %>% arrange(desc(mean_tmax)) %>% slice(1)
+
+p_ytd <- ggplot(ytd_plot_data, aes(year, mean_tmax)) +
+  geom_line(color = "#7a7a7a", linewidth = 0.7, alpha = 0.65) +
+  geom_point(color = "#7a7a7a", size = 1.7, alpha = 0.75) +
+  geom_point(data = current_ytd, color = "#CD3333", size = 3.2) +
+  geom_point(data = record_ytd, color = "#005566", size = 2.9) +
+  geom_text(
+    data = current_ytd,
+    aes(label = paste0(round(mean_tmax, 2), "°C\nrank ", fmt_rank(rank_mean_tmax, nrow(july_ytd)))),
+    hjust = -0.02,
+    nudge_x = 0.35,
+    vjust = 0.25,
+    size = 3.3,
+    fontface = "bold",
+    color = "#CD3333",
+    lineheight = 0.95
+  ) +
+  geom_text(
+    data = record_ytd,
+    aes(label = paste0(year, " record\n", round(mean_tmax, 2), "°C")),
+    hjust = 1.02,
+    nudge_x = -0.35,
+    vjust = -0.15,
+    size = 3.1,
+    fontface = "bold",
+    color = "#005566",
+    lineheight = 0.95
+  ) +
+  scale_x_continuous(breaks = seq(1985, 2025, 5), limits = c(1981, 2028)) +
+  scale_y_continuous(labels = label_number(accuracy = 0.1, suffix = "°C")) +
+  labs(
+    title = "July 1-15 heat is high, but not a record on average",
+    subtitle = "Mean daily maximum temperature for 1-15 July in each year; 2026 is highlighted in red and the archive record in blue.",
+    caption = "Hourly ERA5 archive for Bangalore"
+  ) +
+  theme_weather_question()
+
+p_ytd
+
+chart_ytd_path <- file.path(chart_dir, "july_hot_rainfall_ytd_heat.png")
+ggsave(chart_ytd_path, p_ytd, width = 12, height = 6.5, dpi = 180, bg = "white")
+```
+
+## What does a hot July mean for Jul-Sep rainfall?
+
+This is the historical full-July test. I use complete Julys from 1981-2025, then compare them with the total rainfall in July-September of the same year.
+
+```{r july-full-rain-prep}
+july_full <- daily_weather %>%
+  filter(month == 7, year <= current_year - 1) %>%
+  summarise(
+    mean_tmax = mean(tmax),
+    mean_tmin = mean(tmin),
+    mean_tmean = mean(tmean),
+    days_30 = sum(tmax >= 30),
+    days_31 = sum(tmax >= 31),
+    days_32 = sum(tmax >= 32),
+    days_33 = sum(tmax >= 33),
+    days_35 = sum(tmax >= 35),
+    max_tmax = max(tmax),
+    .by = year
+  )
+
+jas_rain <- daily_weather %>%
+  filter(month %in% 7:9, year <= current_year - 1) %>%
+  summarise(jas_rain_mm = sum(rain_mm), .by = year)
+
+july_full <- july_full %>%
+  left_join(jas_rain, by = "year") %>%
+  mutate(heat_quartile = ntile(mean_tmax, 4))
+
+cor_heat_rain <- cor(july_full$mean_tmax, july_full$jas_rain_mm, use = "complete.obs")
+spearman_heat_rain <- cor(july_full$mean_tmax, july_full$jas_rain_mm, use = "complete.obs", method = "spearman")
+
+list(
+  pearson = cor_heat_rain,
+  spearman = spearman_heat_rain
+)
+```
+
+```{r heat-rain-quartiles}
+july_full %>%
+  group_by(heat_quartile) %>%
+  summarise(
+    n = n(),
+    mean_heat = mean(mean_tmax),
+    mean_jas_rain = mean(jas_rain_mm),
+    median_jas_rain = median(jas_rain_mm),
+    min_jas_rain = min(jas_rain_mm),
+    max_jas_rain = max(jas_rain_mm),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    mean_heat = round(mean_heat, 2),
+    mean_jas_rain = round(mean_jas_rain, 1),
+    median_jas_rain = round(median_jas_rain, 1),
+    min_jas_rain = round(min_jas_rain, 1),
+    max_jas_rain = round(max_jas_rain, 1)
+  )
+```
+
+```{r chart-rain, fig.width=12, fig.height=6.5}
+hot_full <- july_full %>% arrange(desc(mean_tmax)) %>% slice(1:4)
+
+p_rain <- ggplot(july_full, aes(mean_tmax, jas_rain_mm)) +
+  geom_point(color = "#7a7a7a", size = 2, alpha = 0.75) +
+  geom_smooth(method = "lm", se = FALSE, color = "#005566", linewidth = 0.9, linetype = "dashed") +
+  geom_text(
+    data = hot_full,
+    aes(label = year),
+    nudge_y = 10,
+    size = 3.2,
+    fontface = "bold",
+    color = "#3C3C3C"
+  ) +
+  annotate(
+    "text",
+    x = min(july_full$mean_tmax) + 0.05,
+    y = max(july_full$jas_rain_mm),
+    hjust = 0,
+    vjust = 1,
+    label = paste0(
+      "Pearson r = ", round(cor_heat_rain, 2),
+      "\nSpearman ρ = ", round(spearman_heat_rain, 2)
+    ),
+    size = 3.5,
+    fontface = "bold",
+    color = "#005566"
+  ) +
+  scale_y_continuous(labels = label_number(suffix = " mm")) +
+  scale_x_continuous(labels = label_number(accuracy = 0.1, suffix = "°C")) +
+  labs(
+    title = "Hot Julys do not reliably predict wetter or drier Jul-Sep seasons",
+    subtitle = "Complete Julys from 1981-2025 vs same-year July-September rainfall totals. The relationship is close to flat.",
+    caption = "Hourly ERA5 archive for Bangalore"
+  ) +
+  theme_weather_question()
+
+p_rain
+
+chart_rain_path <- file.path(chart_dir, "july_hot_rainfall_seasonal_rain.png")
+ggsave(chart_rain_path, p_rain, width = 12, height = 6.5, dpi = 180, bg = "white")
+```
+
+## Checks
+
+```{r checks}
+list(
+  july_1_15_2026_rank_mean_tmax = current_ytd$rank_mean_tmax,
+  july_1_15_2026_rank_max_tmax = current_ytd$rank_max_tmax,
+  july_1_15_2026_rank_days_33 = current_ytd$rank_days_33,
+  july_1_15_2026_mean_tmax = current_ytd$mean_tmax,
+  july_full_heat_rain_pearson = cor_heat_rain,
+  july_full_heat_rain_spearman = spearman_heat_rain
+)
+```
+
+## Verdict
+
+Insightful: no
+
+The July 1-15 heat is genuinely elevated, but it is not a record on the month-to-date mean maximum temperature scale, and the hotter-end signal is mostly in the single-day peak rather than sustained extreme heat. More importantly, the historical full-July comparison does **not** show a meaningful relationship between hot Julys and Jul-Sep rainfall: the correlation is essentially flat, and the hottest quartile of Julys has about the same seasonal rainfall as the coolest quartile. That makes this a good descriptive check, but not strong enough to publish.
+
+Charts:
+
+- `docs/assets/analysis/july_hot_rainfall_ytd_heat.png`
+- `docs/assets/analysis/july_hot_rainfall_seasonal_rain.png`
+
+Blog post:
+
+- not published
+- if this ever becomes publishable, create `docs/blog/july-hot-rainfall.html`
+- include `This post is AI-written.` at the top of the article body
+- end with an `Original question` section containing `r rmarkdown::metadata$trigger_prompt`
+- add the post to the top of `docs/blog/index.html` and `docs/blog/feed.xml`
+- add `blog_url: "blog/july-hot-rainfall.html"` to the top of `analysis_questions/analyses.yml`

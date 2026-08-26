@@ -1,0 +1,225 @@
+---
+title: "Are June hot days becoming more common, and do they coincide with rain?"
+question: "We seem to have had quite a few hot days this June. How common is this, and what's the relationship to rain? Use only era5 data not gfs."
+trigger_prompt: "we seem to have had quite a few hot days this June. How common is this, and what's the relationship to rain? Use only era5 data not gfs."
+slug: "june-hot-days-rain"
+date: "`r Sys.Date()`"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 160
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+
+theme_weather_question <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+      axis.title = element_blank(),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      legend.position = "none"
+    )
+}
+
+june_daily <- blrTemp %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    temp_c = as.numeric(Temp)
+  ) %>%
+  filter(!is.na(temp_c), month == 6) %>%
+  summarise(
+    tmax = max(temp_c, na.rm = TRUE),
+    tmean = mean(temp_c, na.rm = TRUE),
+    .by = c(date, year)
+  ) %>%
+  left_join(
+    blrRain %>%
+      transmute(
+        DT = as_datetime(DT),
+        date = as_date(DT),
+        year = year(DT),
+        month = month(DT),
+        rain_mm = as.numeric(Rain)
+      ) %>%
+      filter(!is.na(rain_mm), month == 6) %>%
+      summarise(rain_mm = sum(rain_mm, na.rm = TRUE), .by = c(date, year)),
+    by = c("date", "year")
+  ) %>%
+  filter(is.finite(tmax), !is.na(rain_mm)) %>%
+  mutate(
+    hot30 = tmax >= 30,
+    hot31 = tmax >= 31,
+    hot32 = tmax >= 32,
+    hot33 = tmax >= 33,
+    rainy = rain_mm > 0.1
+  )
+
+this_june <- june_daily %>% filter(year == 2026)
+base_june <- june_daily %>% filter(year <= 2025)
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+I treat this as an ERA5-only archive question: how unusual are June hot days, and do they line up with rain or dry spells?
+
+## Data prep
+
+```{r data-overview}
+june_daily %>%
+  summarise(
+    first_year = min(year),
+    last_year = max(year),
+    june_days = n(),
+    years = n_distinct(year),
+    mean_tmax = mean(tmax),
+    mean_rain = mean(rain_mm)
+  )
+```
+
+## How common are hot June days?
+
+```{r hot-day-summary}
+thresholds <- c(30, 31, 32, 33, 34, 35)
+
+hot_summary <- tibble(
+  threshold_c = thresholds,
+  days_all_archive = map_int(thresholds, ~ sum(june_daily$tmax >= .x, na.rm = TRUE)),
+  share_all_archive = map_dbl(thresholds, ~ mean(june_daily$tmax >= .x, na.rm = TRUE)),
+  days_2026_so_far = map_int(thresholds, ~ sum(this_june$tmax >= .x, na.rm = TRUE))
+)
+
+hot_summary
+```
+
+June is usually not a very hot month in Bangalore. In the full ERA5 archive, 35°C is almost a unicorn event in June; even 33°C happens only occasionally. So if this June felt hot, that mostly means it spent more time in the 30-32°C band rather than producing lots of extreme heat.
+
+```{r june-2026}
+this_june %>%
+  select(date, tmax, rain_mm) %>%
+  arrange(date) %>%
+  mutate(
+    tmax = round(tmax, 1),
+    rain_mm = round(rain_mm, 1)
+  )
+```
+
+## Relationship to rain
+
+```{r rain-relationship}
+rain_stats <- tibble(
+  metric = c(
+    "Correlation(tmax, rain)",
+    "Mean rain on days >= 31C",
+    "Mean rain on days < 31C",
+    "Rainy-day share on days >= 31C",
+    "Rainy-day share on days < 31C",
+    "Mean rain on days >= 32C",
+    "Mean rain on days >= 33C"
+  ),
+  value = c(
+    cor(june_daily$tmax, june_daily$rain_mm, use = "complete.obs"),
+    mean(june_daily$rain_mm[june_daily$tmax >= 31], na.rm = TRUE),
+    mean(june_daily$rain_mm[june_daily$tmax < 31], na.rm = TRUE),
+    mean(june_daily$rainy[june_daily$tmax >= 31], na.rm = TRUE),
+    mean(june_daily$rainy[june_daily$tmax < 31], na.rm = TRUE),
+    mean(june_daily$rain_mm[june_daily$tmax >= 32], na.rm = TRUE),
+    mean(june_daily$rain_mm[june_daily$tmax >= 33], na.rm = TRUE)
+  )
+)
+
+rain_stats %>%
+  mutate(value = if_else(grepl("share|Correlation", metric), value, value))
+```
+
+The relationship is *weak and non-linear*. Ordinary warm June days around 30-31°C are not especially dry — they still often come with rain — but the rare 32-33°C days are noticeably drier. So the cleanest summary is: **mild heat and rain can coexist in June, but the very hottest June days tend to sit on the dry side.**
+
+## Chart
+
+```{r chart, fig.width=12, fig.height=6}
+chart_path <- file.path(chart_dir, "june-hot-days-rain.png")
+
+p <- june_daily %>%
+  mutate(temp_bin = cut(
+    tmax,
+    breaks = c(-Inf, 29, 30, 31, 32, 33, Inf),
+    labels = c("<29", "29-30", "30-31", "31-32", "32-33", "33+")
+  )) %>%
+  ggplot(aes(temp_bin, rain_mm, fill = temp_bin)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.8, width = 0.6) +
+  geom_jitter(width = 0.12, alpha = 0.18, size = 1.0) +
+  scale_y_continuous(labels = label_number(accuracy = 0.1, suffix = " mm")) +
+  scale_fill_brewer(palette = "Oranges") +
+  labs(
+    title = "Rain tends to weaken only at the hottest end of June",
+    subtitle = "Daily June rainfall by daily maximum temperature bin, using the full ERA5 archive",
+    caption = "Hourly ERA5 archive for Bangalore; June only"
+  ) +
+  theme_weather_question()
+
+p
+
+ggsave(chart_path, p, width = 12, height = 6, dpi = 180, bg = "white")
+```
+
+## Checks
+
+```{r checks}
+base_june %>%
+  summarise(
+    mean_tmax = mean(tmax),
+    p90_tmax = quantile(tmax, 0.9),
+    p95_tmax = quantile(tmax, 0.95),
+    hot31_days_per_june = mean(tmax >= 31),
+    hot32_days_per_june = mean(tmax >= 32),
+    hot33_days_per_june = mean(tmax >= 33),
+    rain_correlation = cor(tmax, rain_mm, use = "complete.obs")
+  )
+```
+
+## Verdict
+
+Insightful: no
+
+This is a useful descriptive check, but not strong enough to publish. The archive says June hot days are uncommon overall, and the rain relationship is real but modest rather than dramatic. The best takeaway is that Bangalore can have warm-and-wet June days, but the truly hottest June days are comparatively rare and a bit drier.
+
+Charts:
+
+- `docs/assets/analysis/june-hot-days-rain.png`
+
+Blog post:
+
+- not published

@@ -1,0 +1,172 @@
+---
+title: "April 30 and May 2 rain data check"
+question: "Are the heavy Bangalore rains around April 30 and May 2 missing from the local weather data?"
+trigger_prompt: "can you check the data once again? we had fairly heavy rain in bangalore on apr30 and may2. but they don't seem to be recorded here at all"
+slug: "apr30-may2-rain-data-check"
+date: "2026-05-28"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 150
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Data Prep
+
+```{r data-prep}
+rain_hourly <- blrRain %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    day = day(DT),
+    hour = hour(DT),
+    source = Source,
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  filter(!is.na(rain_mm))
+
+rain_daily <- rain_hourly %>%
+  summarise(
+    hours = n(),
+    rain_mm = sum(rain_mm, na.rm = TRUE),
+    max_hour_mm = max(rain_mm, na.rm = TRUE),
+    .by = c(date, source)
+  )
+
+rain_hourly %>%
+  summarise(
+    first_dt = min(DT),
+    last_dt = max(DT),
+    rows = n(),
+    sources = paste(sort(unique(source)), collapse = ", ")
+  )
+```
+
+## Local Check
+
+```{r local-daily-window}
+rain_daily %>%
+  filter(date >= as_date("2026-04-25"), date <= as_date("2026-05-05")) %>%
+  arrange(date, source)
+```
+
+```{r target-hourly}
+rain_hourly %>%
+  filter(date %in% as_date(c("2026-04-30", "2026-05-02"))) %>%
+  select(DT, date, source, rain_mm) %>%
+  arrange(DT)
+```
+
+```{r exported-csv-check}
+exported_daily <- read_csv(
+  file.path(root_dir, "docs", "data", "bangalore_daily_weather.csv"),
+  show_col_types = FALSE
+) %>%
+  mutate(DT = as_date(DT))
+
+exported_daily %>%
+  filter(DT >= as_date("2026-04-25"), DT <= as_date("2026-05-05"))
+```
+
+The current local data does not have both days as zero. April 30 is now present as
+8.85 mm in the ERA5/Oikolab hourly file and in the exported CSV. May 2 is still
+0.00 mm.
+
+## External Context
+
+This is not just a user-memory mismatch. Multiple public reports describe a major
+Bengaluru rain event on April 29/30, with IMD city-observatory totals around
+110-111 mm and heavy waterlogging. Search results also surfaced a May 2 report of
+intense rainfall in central/east localities such as MG Road, Shivajinagar,
+Indiranagar, and Commercial Street.
+
+Useful reference URLs checked:
+
+- https://indianexpress.com/article/cities/bangalore/bengaluru-rainfall-record-april-111mm-deaths-damage-10663611/
+- https://newsable.asianetnews.com/karnataka-news/bengaluru-rains-imd-records-111-mm-rainfall-highest-ever-april-orange-alert-issued-severe-hailstorm-articleshow-unfr05v
+- https://newskarnataka.com/bengaluru/sudden-cloudburst-like-rains-overwhelm-central-bengaluru/02052026/
+
+## Checks
+
+```{r historical-context}
+target_days <- rain_daily %>%
+  filter(date %in% as_date(c("2026-04-30", "2026-05-02"))) %>%
+  select(date, source, rain_mm, max_hour_mm)
+
+calendar_day_context <- rain_daily %>%
+  mutate(md = format(date, "%m-%d")) %>%
+  filter(year(date) < 2026, md %in% c("04-30", "05-02")) %>%
+  summarise(
+    years = n(),
+    median_mm = median(rain_mm),
+    p90_mm = quantile(rain_mm, 0.9),
+    max_mm = max(rain_mm),
+    .by = md
+  )
+
+target_days
+calendar_day_context
+```
+
+April 30's 8.85 mm is high relative to this grid's own April 30 history, but it is
+far below the reported city-observatory event. May 2 is in the lower tail for this
+grid and contradicts reports of localized heavy rain in parts of the city.
+
+The likely problem is spatial representativeness. The project uses a point/grid
+series for Bangalore from Oikolab/ERA5/GFS. Short pre-monsoon thunderstorms can be
+extremely localized. A city event can be severe in central, south, or east
+Bengaluru while a gridded point or an airport-adjacent station misses most of the
+rain. This also explains why a later May 21 report noted 44.2 mm at the city
+observatory but only 3.8 mm near HAL.
+
+## Verdict
+
+Insightful: no
+
+April 30 is no longer absent in the current local export: it is recorded as
+8.85 mm. But that is still a severe undercount against public IMD-style reports
+near 110-111 mm for the city event. May 2 remains absent from the local rainfall
+series at 0.00 mm, despite reports of intense localized rain in central/east
+Bengaluru.
+
+This should not be published as a blog post. It is a data QA finding: the rain
+series is not reliable for localized convective storm totals, and the site should
+carry a stronger caveat or switch/augment rainfall with an observed city rain-gauge
+source if those dates matter.
+
+Charts:
+
+- none
+
+Blog post:
+
+- not published

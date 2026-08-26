@@ -1,0 +1,237 @@
+---
+title: "Bangalore afternoon temperature when rain starts"
+question: "on the days it has rained in Bangalore  what has been the average afternoon temperature at the time of the rain starting?"
+trigger_prompt: "on the days it has rained in Bangalore  what has been the average afternoon temperature at the time of the rain starting?"
+slug: "rain-start-afternoon-temp"
+date: "2026-07-03"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 150
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+
+theme_weather_question <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+      axis.title = element_blank(),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      legend.position = "none"
+    )
+}
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Analysis contract
+
+- *Rain starts* means the first hourly observation on a given day with more than `0.1 mm` of rain.
+- *Afternoon* means `12:00-17:59` IST.
+- Unit of analysis: rainy day.
+- Main metric: temperature at the first rainy hour, averaged across rainy days.
+- Sensitivity check: repeat with a looser rain threshold of `> 0 mm`.
+
+## Data prep
+
+```{r data-prep}
+temp_hourly <- blrTemp %>%
+  transmute(
+    DT = as.POSIXct(DT, tz = "Asia/Kolkata"),
+    date = as.Date(DT),
+    hour = hour(DT),
+    temp_c = as.numeric(Temp)
+  ) %>%
+  filter(is.finite(temp_c))
+
+rain_hourly <- blrRain %>%
+  transmute(
+    DT = as.POSIXct(DT, tz = "Asia/Kolkata"),
+    date = as.Date(DT),
+    hour = hour(DT),
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  filter(is.finite(rain_mm))
+
+hourly <- temp_hourly %>%
+  inner_join(rain_hourly %>% select(DT, rain_mm), by = "DT")
+
+rain_starts <- hourly %>%
+  mutate(rainy = rain_mm > 0.1) %>%
+  group_by(date) %>%
+  arrange(DT) %>%
+  filter(any(rainy)) %>%
+  summarise(
+    start_dt = min(DT[rainy]),
+    start_hour = hour(start_dt),
+    start_temp = temp_c[match(start_dt, DT)],
+    start_rain = rain_mm[match(start_dt, DT)],
+    afternoon = start_hour %in% 12:17,
+    .groups = "drop"
+  )
+
+rain_starts_any <- hourly %>%
+  mutate(rainy = rain_mm > 0) %>%
+  group_by(date) %>%
+  arrange(DT) %>%
+  filter(any(rainy)) %>%
+  summarise(
+    start_dt = min(DT[rainy]),
+    start_hour = hour(start_dt),
+    start_temp = temp_c[match(start_dt, DT)],
+    afternoon = start_hour %in% 12:17,
+    .groups = "drop"
+  )
+
+coverage <- hourly %>%
+  summarise(
+    first_dt = min(DT),
+    last_dt = max(DT),
+    hours = n(),
+    days = n_distinct(date),
+    years = n_distinct(year(date))
+  )
+
+rain_starts %>%
+  summarise(
+    rainy_days = n(),
+    mean_start_temp = mean(start_temp),
+    median_start_temp = median(start_temp),
+    afternoon_days = sum(afternoon),
+    share_afternoon = mean(afternoon),
+    mean_afternoon_start_temp = mean(start_temp[afternoon])
+  )
+```
+
+```{r start-hour-summary}
+start_hour_summary <- rain_starts %>%
+  summarise(
+    rainy_days = n(),
+    mean_start_temp = mean(start_temp),
+    median_start_temp = median(start_temp),
+    .by = start_hour
+  ) %>%
+  mutate(
+    afternoon = start_hour %in% 12:17,
+    start_hour_label = sprintf("%02d:00", start_hour)
+  ) %>%
+  arrange(start_hour)
+
+afternoon_summary <- rain_starts %>%
+  filter(afternoon) %>%
+  summarise(
+    rainy_days = n(),
+    mean_start_temp = mean(start_temp),
+    median_start_temp = median(start_temp),
+    min_start_temp = min(start_temp),
+    max_start_temp = max(start_temp)
+  )
+
+sensitivity_summary <- rain_starts_any %>%
+  summarise(
+    rainy_days = n(),
+    mean_start_temp = mean(start_temp),
+    afternoon_days = sum(afternoon),
+    share_afternoon = mean(afternoon),
+    mean_afternoon_start_temp = mean(start_temp[afternoon])
+  )
+
+start_hour_summary %>%
+  mutate(
+    mean_start_temp = round(mean_start_temp, 1),
+    median_start_temp = round(median_start_temp, 1)
+  )
+```
+
+## What the archive says
+
+Across the full archive, there are `r comma(nrow(rain_starts))` rainy days with a detectable rain start using the `> 0.1 mm` rule. About `r percent(mean(rain_starts$afternoon), accuracy = 0.1)` of those starts happen in the afternoon.
+
+The average temperature at the first rainy hour on all rainy days is `r round(mean(rain_starts$start_temp), 1)`°C. If I restrict to rainy-day starts that actually occur in the afternoon, the average is `r round(mean(rain_starts$start_temp[rain_starts$afternoon]), 1)`°C.
+
+```{r chart}
+chart_path <- file.path(chart_dir, "rain-start-afternoon-temp.png")
+
+plot_data <- start_hour_summary %>%
+  mutate(start_hour_label = factor(start_hour_label, levels = start_hour_label))
+
+p <- ggplot(plot_data, aes(x = start_hour, y = mean_start_temp)) +
+  geom_col(aes(fill = afternoon), width = 0.8) +
+  geom_point(size = 1.8, color = "#3C3C3C") +
+  geom_text(
+    aes(label = paste0(round(mean_start_temp, 1), "°")),
+    vjust = -0.6,
+    size = 3.1,
+    fontface = "bold",
+    color = "#3C3C3C"
+  ) +
+  scale_fill_manual(values = c(`TRUE` = "#4F8A35", `FALSE` = "#C7B9A6")) +
+  scale_x_continuous(breaks = seq(0, 23, 3), labels = paste0(seq(0, 23, 3), ":00")) +
+  scale_y_continuous(labels = label_number(suffix = "°C"), expand = expansion(mult = c(0, 0.08))) +
+  labs(
+    title = "Rain starts that happen in the afternoon are warmer",
+    subtitle = "Mean temperature at the first rainy hour on rainy days, by start hour. Afternoon hours are highlighted in green.",
+    caption = "Data: ERA5 via Oikolab. Rain start = first hour with >0.1 mm rain on a day."
+  ) +
+  theme_weather_question()
+
+p
+
+ggsave(chart_path, p, width = 12, height = 6, dpi = 180, bg = "white")
+```
+
+## Checks
+
+- The result is stable if I loosen the rain definition to `> 0 mm`.
+- The broader rainy-day average start temperature is `r round(sensitivity_summary$mean_start_temp, 1)`°C, and afternoon starts under that looser rule average `r round(sensitivity_summary$mean_afternoon_start_temp, 1)`°C.
+- The answer is sensitive to how *afternoon* is defined, so I keep the operational window explicit.
+
+## Verdict
+
+Insightful: no
+
+This is a clean descriptive average, but it does not sharpen a strong prior or reveal a surprising pattern. The useful answer is that rainy-day starts in the afternoon average about `r round(afternoon_summary$mean_start_temp, 1)`°C, with most of those starts landing around mid-to-late afternoon rather than a single sharp hour. That is informative, but not distinctive enough to publish.
+
+Charts:
+
+- `docs/assets/analysis/rain-start-afternoon-temp.png`
+
+Blog post:
+
+- not published
+- if this becomes insightful, create `docs/blog/rain-start-afternoon-temp.html`
+- include `This post is AI-written.` at the top of the article body
+- end with an `Original question` section containing `r rmarkdown::metadata$trigger_prompt`
+- add the post to the top of `docs/blog/index.html` and `docs/blog/feed.xml`
+- add `blog_url: "blog/rain-start-afternoon-temp.html"` to `analysis_questions/analyses.yml`

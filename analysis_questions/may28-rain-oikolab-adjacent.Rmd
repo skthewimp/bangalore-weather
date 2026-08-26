@@ -1,0 +1,222 @@
+---
+title: "May 28 rain Oikolab adjacent-point check"
+question: "Did Oikolab miss the rain on the night of May 28, 2026, and how do nearby latitude/longitude points compare with IMD?"
+trigger_prompt: "there was massaive rain again last night and the dataset doesn't seem to have picked up. can you check for adjmacent lattlongs from oikolab as well and report the numbers? and compare  to IMD"
+slug: "may28-rain-oikolab-adjacent"
+date: "2026-05-29"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 150
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Windows
+
+The IMD daily station page for Met Centre Bengaluru was checked for the report
+dated 2026-05-29, reported at 08:30 IST. To match that convention, the Oikolab
+comparison below uses the 24-hour window from after 08:30 IST on 2026-05-28
+through 08:30 IST on 2026-05-29.
+
+For "last night", I also break out 18:30 IST on 2026-05-28 through 08:30 IST on
+2026-05-29.
+
+## Local Data Check
+
+```{r local-data-check}
+start_24h <- as.POSIXct("2026-05-28 08:30:00", tz = "Asia/Kolkata")
+start_night <- as.POSIXct("2026-05-28 18:30:00", tz = "Asia/Kolkata")
+start_midnight <- as.POSIXct("2026-05-29 00:30:00", tz = "Asia/Kolkata")
+end_24h <- as.POSIXct("2026-05-29 08:30:00", tz = "Asia/Kolkata")
+
+local_hourly <- blrRain %>%
+  transmute(
+    DT = as.POSIXct(DT, tz = "Asia/Kolkata"),
+    source = Source,
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  filter(DT > start_24h, DT <= end_24h)
+
+local_hourly %>%
+  summarise(
+    first_dt = min(DT),
+    last_dt = max(DT),
+    hours_present = n(),
+    rain_24h_to_0830 = sum(rain_mm, na.rm = TRUE),
+    rain_1830_to_0830 = sum(rain_mm[DT >= start_night], na.rm = TRUE),
+    max_hour = max(rain_mm, na.rm = TRUE),
+    sources = paste(sort(unique(source)), collapse = ", ")
+  )
+```
+
+The local file had rows only through 05:30 IST at the time of this check, so it
+misses the 06:30-08:30 rows available from a direct Oikolab query.
+
+```{r local-hourly-rain}
+local_hourly %>%
+  filter(rain_mm > 0) %>%
+  select(DT, source, rain_mm)
+```
+
+## Direct Oikolab Check
+
+I queried Oikolab directly for `total_precipitation`, hourly frequency, model/source
+returned as `gfs`. The API timestamps were requested as UTC (`2026-05-28T03:00:00`
+to `2026-05-29T03:00:00`) to match 08:30 IST to 08:30 IST.
+
+The grid uses the project point and adjacent points offset by 0.10 degrees in
+latitude and/or longitude, plus approximate IMD station coordinates for City, HAL,
+KIA, and GKVK.
+
+```{r oikolab-grid-results}
+oiko_grid <- tribble(
+  ~name, ~lat, ~lon, ~source, ~rain_24h_to_0830, ~rain_1830_to_0830, ~rain_1830_to_2330, ~rain_0030_to_0830, ~max_hour, ~hours,
+  "S", 12.8716, 77.5946, "gfs", 12.78, 12.73, 8.73, 4.00, 3.87, 24,
+  "IMD City approx", 12.9760, 77.5900, "gfs", 11.93, 11.79, 5.72, 6.07, 3.59, 24,
+  "Center", 12.9716, 77.5946, "gfs", 11.87, 11.74, 5.64, 6.10, 3.50, 24,
+  "NE", 13.0716, 77.6946, "gfs", 11.83, 11.76, 2.07, 9.69, 5.19, 24,
+  "W", 12.9716, 77.4946, "gfs", 11.60, 11.56, 6.21, 5.35, 4.62, 24,
+  "SW", 12.8716, 77.4946, "gfs", 11.14, 11.13, 7.16, 3.97, 3.88, 24,
+  "SE", 12.8716, 77.6946, "gfs", 10.64, 10.63, 7.36, 3.27, 2.96, 24,
+  "GKVK approx", 13.0800, 77.5800, "gfs", 10.57, 10.36, 4.49, 5.87, 3.93, 24,
+  "N", 13.0716, 77.5946, "gfs", 10.57, 10.36, 4.29, 6.07, 3.83, 24,
+  "KIA approx", 13.2000, 77.7100, "gfs", 10.39, 10.39, 1.19, 9.20, 5.52, 24,
+  "NW", 13.0716, 77.4946, "gfs", 10.10, 10.03, 5.06, 4.97, 4.54, 24,
+  "HAL approx", 12.9500, 77.6700, "gfs", 9.32, 9.27, 3.49, 5.78, 2.45, 24,
+  "E", 12.9716, 77.6946, "gfs", 9.06, 9.02, 2.59, 6.43, 2.64, 24
+)
+
+oiko_grid %>%
+  arrange(desc(rain_24h_to_0830))
+```
+
+```{r oikolab-center-hourly}
+oiko_center_hourly <- tribble(
+  ~DT, ~source, ~rain_mm,
+  "2026-05-28 17:30:00", "gfs", 0.13,
+  "2026-05-28 18:30:00", "gfs", 0.16,
+  "2026-05-28 19:30:00", "gfs", 0.01,
+  "2026-05-28 21:30:00", "gfs", 1.80,
+  "2026-05-28 22:30:00", "gfs", 3.50,
+  "2026-05-28 23:30:00", "gfs", 0.17,
+  "2026-05-29 00:30:00", "gfs", 2.38,
+  "2026-05-29 01:30:00", "gfs", 2.74,
+  "2026-05-29 07:30:00", "gfs", 0.27,
+  "2026-05-29 08:30:00", "gfs", 0.71
+) %>%
+  mutate(DT = as.POSIXct(DT, tz = "Asia/Kolkata"))
+
+oiko_center_hourly
+```
+
+The direct Oikolab check does show rain. Across the nearby points, the 24-hour
+total ranges from 9.06 to 12.78 mm. The project point is 11.87 mm for the IMD
+reporting day and 11.74 mm for the evening/overnight slice.
+
+## IMD Comparison
+
+IMD's "Today's Weather Report" page for Met Centre Bengaluru, date 2026-05-29,
+reported at 08:30 IST, listed these rainfall observations:
+
+```{r imd-comparison}
+imd_station <- tribble(
+  ~station, ~imd_rain_mm,
+  "Bengaluru-City", 0.3,
+  "Bengaluru HAL Airport", 0.0,
+  "Bengaluru International Airport", 0.0,
+  "Bengaluru-GKVK", 0.0
+)
+
+oiko_station <- oiko_grid %>%
+  filter(name %in% c("IMD City approx", "HAL approx", "KIA approx", "GKVK approx")) %>%
+  transmute(
+    station = recode(
+      name,
+      "IMD City approx" = "Bengaluru-City",
+      "HAL approx" = "Bengaluru HAL Airport",
+      "KIA approx" = "Bengaluru International Airport",
+      "GKVK approx" = "Bengaluru-GKVK"
+    ),
+    oikolab_rain_24h_to_0830 = rain_24h_to_0830,
+    oikolab_rain_1830_to_0830 = rain_1830_to_0830
+  )
+
+imd_station %>%
+  left_join(oiko_station, by = "station") %>%
+  mutate(
+    imd_rain_label = if_else(station == "Bengaluru HAL Airport", "TRACE", as.character(imd_rain_mm)),
+    oikolab_minus_imd = oikolab_rain_24h_to_0830 - imd_rain_mm
+  ) %>%
+  select(station, imd_rain_label, oikolab_rain_24h_to_0830, oikolab_rain_1830_to_0830, oikolab_minus_imd)
+```
+
+IMD district rainfall summary for 2026-05-28 listed Bengaluru Urban at 0.1 mm
+actual rainfall against 5.3 mm normal. That is consistent with the low IMD station
+totals, not with the Oikolab/GFS 9-13 mm field.
+
+Sources checked:
+
+- https://mausam.imd.gov.in/imd_latest/contents/Todaysweather_mc.php?id=13
+- https://mausam.imd.gov.in/bengaluru/mcdata/cum_stats.pdf
+
+## Checks
+
+The Oikolab source for this very recent date is `gfs`, not ERA5. That matters:
+the daily updater intentionally uses GFS for the most recent days and later repairs
+older windows to ERA5 once reanalysis is available.
+
+This check also shows that "dataset doesn't seem to have picked up" depends on
+which file is being inspected. The local stored file had the main rain pulse, but
+it had not yet picked up the final 06:30-08:30 IST hours. The direct Oikolab API
+had them.
+
+## Verdict
+
+Insightful: no
+
+Oikolab did not miss the May 28/29 overnight rain in the direct query. The project
+point gives 11.87 mm for the IMD 24-hour reporting window ending 08:30 IST on
+2026-05-29, with nearby points ranging from 9.06 to 12.78 mm. Most of that fell
+after 18:30 IST.
+
+The bigger issue is disagreement with IMD observations: IMD's 08:30 IST station
+report has Bengaluru-City at 0.3 mm, HAL as trace, and KIA/GKVK as nil; its district
+summary has Bengaluru Urban at 0.1 mm for 2026-05-28. So this is not another
+"Oikolab missed a massive observed total" case. It is the opposite for this window:
+Oikolab/GFS is wetter than the IMD station and district reports.
+
+Do not publish this as a blog post. It is a data QA note for the very recent GFS
+portion of the feed, and should be revisited after the backfill switches the window
+to ERA5.
+
+Charts:
+
+- none
+
+Blog post:
+
+- not published

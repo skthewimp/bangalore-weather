@@ -1,0 +1,280 @@
+---
+title: "Bangalore morning rain between 8-10am"
+question: "When does it rain in Bangalore in the morning 8-10 am? do we ever require an umbrella then?"
+trigger_prompt: "when does it rain in Bangalore in the morning 8-10 am? do we ever require an umbrella then?"
+slug: "bangalore-morning-rain-8to10"
+date: "`r Sys.Date()`"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 7,
+  dpi = 160
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+
+question_theme <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+      axis.title = element_blank(),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      legend.title = element_blank()
+    )
+}
+
+fmt_pct <- label_percent(accuracy = 1)
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Analysis contract
+
+- **Unit of analysis:** one observed hourly record.
+- **Main denominator:** all observed hours in 1981-2025, or all 8-10am hours when looking at the commute window.
+- **Main metric:** share of hours with rain > 0.1 mm.
+- **Sensitivity check:** rain > 0 mm gives the same broad timing.
+- **Comparison:** month-by-month timing, with a focus on the 8-10am window.
+- **Umbrella proxy:** any rain in the 8-10am window on a given day.
+
+## Data prep
+
+```{r data-prep}
+rain_hourly <- blrRain %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    hour = hour(DT),
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  filter(!is.na(rain_mm), year >= 1981, year <= 2025)
+
+rain_summary <- rain_hourly %>%
+  summarise(
+    first_dt = min(DT),
+    last_dt = max(DT),
+    rows = n(),
+    days = n_distinct(date),
+    years = n_distinct(year)
+  )
+
+rain_summary
+```
+
+## What the archive says
+
+The 8-10am window is *not* Bangalore's wettest time of day. Rain in that window is mostly a monsoon and post-monsoon story: it picks up sharply from June, peaks in July-August, stays fairly active into October-November, and is rare in the driest months.
+
+Within the morning itself, 10am is the rainiest of the three hours. Across the full 1981-2025 archive, the share of rainy hours is about 0.9% at 8am, 1.5% at 9am, and 2.5% at 10am in January; it jumps to about 19.5%, 21.9%, and 31.6% in July.
+
+```{r facts-table}
+morning_hours <- rain_hourly %>%
+  filter(hour %in% 8:10) %>%
+  summarise(
+    rainy_share = mean(rain_mm > 0.1),
+    mean_mm = mean(rain_mm),
+    median_mm = median(rain_mm),
+    p90_mm = as.numeric(quantile(rain_mm, 0.9)),
+    .by = c(month, hour)
+  ) %>%
+  mutate(
+    month_name = month.abb[month],
+    rainy_share = round(rainy_share, 3),
+    mean_mm = round(mean_mm, 3),
+    median_mm = round(median_mm, 3),
+    p90_mm = round(p90_mm, 3)
+  ) %>%
+  arrange(month, hour)
+
+morning_hours
+```
+
+```{r window-days}
+morning_window <- rain_hourly %>%
+  filter(hour %in% 8:10) %>%
+  summarise(
+    window_mm = sum(rain_mm),
+    rainy_any = any(rain_mm > 0.1),
+    rainy_hours = sum(rain_mm > 0.1),
+    .by = c(date, year, month)
+  )
+
+window_by_month <- morning_window %>%
+  summarise(
+    share = mean(rainy_any),
+    mean_mm = mean(window_mm),
+    p90_mm = as.numeric(quantile(window_mm, 0.9)),
+    .by = month
+  ) %>%
+  mutate(
+    month_name = month.abb[month],
+    share = round(share, 3),
+    mean_mm = round(mean_mm, 3),
+    p90_mm = round(p90_mm, 3)
+  ) %>%
+  arrange(month)
+
+window_by_month
+```
+
+A useful commute-window read is: a day gets at least one rainy 8-10am hour about **17%** of the time overall, but that rises to **25-39%** in June-August and stays elevated into October-November.
+
+```{r seasonal-check}
+seasonal_window <- morning_window %>%
+  mutate(season = case_when(
+    month %in% c(12, 1, 2) ~ "DJF",
+    month %in% 3:5 ~ "MAM",
+    month %in% 6:9 ~ "JJA",
+    TRUE ~ "OND"
+  )) %>%
+  summarise(
+    share = mean(rainy_any),
+    mean_mm = mean(window_mm),
+    .by = season
+  ) %>%
+  mutate(
+    share = round(share, 3),
+    mean_mm = round(mean_mm, 3)
+  ) %>%
+  arrange(match(season, c("DJF", "MAM", "JJA", "OND")))
+
+seasonal_window
+```
+
+## Chart 1: where 8-10am fits in the daily rain clock
+
+```{r chart-heatmap, fig.width=12, fig.height=7}
+heatmap_data <- rain_hourly %>%
+  summarise(
+    rainy_share = mean(rain_mm > 0.1),
+    .by = c(month, hour)
+  ) %>%
+  mutate(month_name = factor(month.abb[month], levels = rev(month.abb)))
+
+p_heat <- ggplot(heatmap_data, aes(x = hour, y = month_name, fill = rainy_share)) +
+  geom_tile(color = "white", linewidth = 0.25) +
+  annotate(
+    "rect",
+    xmin = 7.5,
+    xmax = 10.5,
+    ymin = 0.5,
+    ymax = 12.5,
+    fill = NA,
+    color = "#CD3333",
+    linewidth = 0.7,
+    linetype = "dashed"
+  ) +
+  scale_x_continuous(breaks = seq(0, 23, 2), labels = paste0(seq(0, 23, 2), ":00"), limits = c(0, 23)) +
+  scale_fill_gradient(low = "#f3efe8", high = "#228B22", labels = fmt_pct) +
+  labs(
+    title = "Rainy hours cluster in monsoon and post-monsoon, not in the 8-10am commute band",
+    subtitle = "Share of hours with >0.1 mm rain, 1981-2025. Red box marks 8-10am.",
+    caption = "Data: ERA5 via Oikolab"
+  ) +
+  question_theme() +
+  theme(
+    axis.text.y = element_text(size = 9),
+    legend.position = "bottom",
+    legend.key.width = unit(1.8, "cm")
+  )
+
+p_heat
+
+chart_heatmap_path <- file.path(chart_dir, "bangalore_morning_rain_heatmap.png")
+ggsave(chart_heatmap_path, p_heat, width = 12, height = 7, dpi = 180, bg = "white")
+```
+
+## Chart 2: how often the 8-10am window needs an umbrella
+
+```{r chart-window, fig.width=12, fig.height=6}
+p_window <- ggplot(window_by_month, aes(x = month, y = share)) +
+  geom_col(fill = "#5f3946", width = 0.7) +
+  geom_text(
+    aes(label = paste0(month_name, "\n", round(share * 100), "%")),
+    vjust = -0.35,
+    size = 3.2,
+    fontface = "bold",
+    color = "#3C3C3C",
+    lineheight = 0.9
+  ) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_y_continuous(labels = fmt_pct, limits = c(0, 0.45), expand = expansion(mult = c(0, 0.08))) +
+  labs(
+    title = "An umbrella is mainly a monsoon/post-monsoon morning concern",
+    subtitle = "Share of days with at least one rainy hour between 8am and 10am",
+    caption = "Rainy day = at least one hour in the window above 0.1 mm"
+  ) +
+  question_theme()
+
+p_window
+
+chart_window_path <- file.path(chart_dir, "bangalore_morning_rain_window_share.png")
+ggsave(chart_window_path, p_window, width = 12, height = 6, dpi = 180, bg = "white")
+```
+
+## Checks
+
+```{r checks}
+rain_hourly %>%
+  filter(hour %in% 8:10) %>%
+  summarise(
+    share_gt_0 = mean(rain_mm > 0),
+    share_gt_0_1 = mean(rain_mm > 0.1),
+    share_gt_1 = mean(rain_mm > 1),
+    .by = hour
+  )
+```
+
+The broad timing survives a looser `> 0 mm` threshold: 10am is still the wettest morning hour, and the same wet-season shape remains. The exact percentages move a little, but the story does not.
+
+## Verdict
+
+Insightful: no
+
+This is a useful commuting answer, but it is not novel enough to publish as a standalone post. The pattern is straightforward once you look at the hourly archive: 8-10am rain is mostly a June-November phenomenon, with 10am the rainiest of the three hours, and the strongest umbrella need in July-August.
+
+It sharpens the intuition a bit, but it does not clear the publication bar because the effect is seasonal and descriptive rather than surprising. Keep it as a notebook answer, not a blog post.
+
+Charts:
+
+- `docs/assets/analysis/bangalore_morning_rain_heatmap.png`
+- `docs/assets/analysis/bangalore_morning_rain_window_share.png`
+
+Blog post:
+
+- not published
+- if this ever becomes publishable, create `docs/blog/bangalore-morning-rain-8to10.html`
+- include `This post is AI-written.` at the top of the article body
+- end with an `Original question` section containing `r rmarkdown::metadata$trigger_prompt`
+- add the post to the top of `docs/blog/index.html` and `docs/blog/feed.xml`
+- add `blog_url: "blog/bangalore-morning-rain-8to10.html"` to the top of `analysis_questions/analyses.yml`

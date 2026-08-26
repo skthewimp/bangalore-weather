@@ -1,0 +1,272 @@
+---
+title: "How bad was July 2026 in Bangalore?"
+question: "How bad was this July in bangalore in terms of rainfall and heat ?"
+trigger_prompt: |
+  Work in /home/karthik/apps/bangalore-weather. HERMES DRAFT MODE. Treat the following as the exact weather question trigger_prompt. Follow the Hermes draft workflow in analysis_questions/README.md and AGENTS.md: create and run the analysis notebook, write the Verdict, create analysis charts if needed, and decide insightfulness strictly. Do not create or modify docs/blog, docs/index.html, docs/blog/feed.xml, analysis_questions/analyses.yml, do not commit, and do not push. Reply with the gist of the analysis, the insightfulness verdict, files created, and if publishable ask for explicit approval using /weather_publish <slug>. Question: How bad was this July in bangalore in terms of rainfall and heat ?
+slug: "july-2026-heat-rain"
+date: "`r Sys.Date()`"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 160
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(patchwork)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+
+analysis_date <- max(as_datetime(blrTemp$DT), na.rm = TRUE) |> as_date()
+analysis_year <- year(analysis_date)
+
+n_years <- length(unique(year(as_datetime(blrTemp$DT))))
+
+analysis_theme <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "#e5e1d8", color = NA),
+      panel.background = element_rect(fill = "#e5e1d8", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+      axis.title = element_blank(),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      plot.margin = margin(15, 18, 15, 15)
+    )
+}
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Analysis frame
+
+- July 2026 is complete in the local archive, so the clean comparison is full July 2026 vs full historical Julys.
+- "Heat" is measured by the monthly mean of daily maximum temperature.
+- "Rainfall" is measured by total July precipitation.
+- I also check how many July days crossed 30°C, 31°C, 32°C, 33°C, and 35°C because average heat can hide a lack of true spikes.
+- Data source is the local ERA5 archive only.
+
+## Data prep
+
+```{r data-prep}
+temp_hourly <- blrTemp %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    temp_c = as.numeric(Temp)
+  ) %>%
+  filter(!is.na(temp_c))
+
+rain_hourly <- blrRain %>%
+  transmute(
+    DT = as_datetime(DT),
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  filter(!is.na(rain_mm))
+
+daily_weather <- temp_hourly %>%
+  summarise(
+    tmin = min(temp_c, na.rm = TRUE),
+    tmax = max(temp_c, na.rm = TRUE),
+    tmean = mean(temp_c, na.rm = TRUE),
+    .by = c(date, year, month)
+  ) %>%
+  left_join(
+    rain_hourly %>%
+      summarise(rain_mm = sum(rain_mm, na.rm = TRUE), .by = c(date, year, month)),
+    by = c("date", "year", "month")
+  ) %>%
+  filter(is.finite(tmin), is.finite(tmax), !is.na(rain_mm))
+
+july_stats <- daily_weather %>%
+  filter(month == 7) %>%
+  summarise(
+    mean_tmax = mean(tmax),
+    mean_tmin = mean(tmin),
+    mean_tmean = mean(tmean),
+    max_tmax = max(tmax),
+    rain_total = sum(rain_mm),
+    rainy_days = sum(rain_mm > 0.1),
+    days_30 = sum(tmax >= 30),
+    days_31 = sum(tmax >= 31),
+    days_32 = sum(tmax >= 32),
+    days_33 = sum(tmax >= 33),
+    days_35 = sum(tmax >= 35),
+    .by = year
+  ) %>%
+  mutate(
+    rank_heat = min_rank(desc(mean_tmax)),
+    rank_rain = min_rank(rain_total),
+    rank_dry = min_rank(rain_total),
+    heat_percentile = percent_rank(mean_tmax),
+    rain_percentile = percent_rank(rain_total)
+  )
+
+current_july <- july_stats %>% filter(year == analysis_year)
+current_july
+```
+
+## Quick facts
+
+```{r facts}
+july_stats %>%
+  summarise(
+    year = first(year),
+    n_years = n(),
+    current_mean_tmax = round(current_july$mean_tmax, 2),
+    current_rain_total = round(current_july$rain_total, 1),
+    heat_rank = paste0(current_july$rank_heat, " / ", n()),
+    rain_rank = paste0(current_july$rank_rain, " / ", n()),
+    heat_percentile = round(current_july$heat_percentile, 3),
+    rain_percentile = round(current_july$rain_percentile, 3),
+    max_tmax = round(current_july$max_tmax, 2),
+    days_30 = current_july$days_30,
+    days_31 = current_july$days_31,
+    days_32 = current_july$days_32,
+    days_33 = current_july$days_33,
+    days_35 = current_july$days_35,
+    rainy_days = current_july$rainy_days
+  )
+```
+
+## Heat and rainfall through time
+
+```{r chart-main, fig.width=12, fig.height=8.5}
+heat_median <- median(july_stats$mean_tmax)
+rain_median <- median(july_stats$rain_total)
+
+heat_panel <- ggplot(july_stats, aes(year, mean_tmax)) +
+  geom_line(color = "grey70", linewidth = 0.8) +
+  geom_point(color = "grey65", size = 1.7) +
+  geom_hline(yintercept = heat_median, linetype = "dashed", color = "#888888", linewidth = 0.4) +
+  geom_point(data = current_july, color = "#CD3333", size = 3.2) +
+  geom_text(
+    data = current_july,
+    aes(label = paste0(round(mean_tmax, 2), "°C\nrank ", rank_heat, " hottest / ", n_years)),
+    hjust = -0.05,
+    vjust = 0.5,
+    nudge_x = 0.35,
+    size = 3.3,
+    fontface = "bold",
+    color = "#CD3333",
+    lineheight = 0.95
+  ) +
+  scale_x_continuous(breaks = seq(1985, 2025, 5), limits = c(1981, 2028)) +
+  scale_y_continuous(labels = label_number(accuracy = 0.1, suffix = "°C")) +
+  labs(
+    title = "Mean July heat",
+    subtitle = "Monthly mean of daily maximum temperature; 2026 is highlighted in red.",
+    caption = "Hourly ERA5 archive for Bangalore"
+  ) +
+  analysis_theme()
+
+rain_panel <- ggplot(july_stats, aes(year, rain_total)) +
+  geom_line(color = "grey70", linewidth = 0.8) +
+  geom_point(color = "grey65", size = 1.7) +
+  geom_hline(yintercept = rain_median, linetype = "dashed", color = "#888888", linewidth = 0.4) +
+  geom_point(data = current_july, color = "#CD3333", size = 3.2) +
+  geom_text(
+    data = current_july,
+    aes(label = paste0(round(rain_total, 1), " mm\nrank ", rank_dry, " driest / ", n_years)),
+    hjust = -0.05,
+    vjust = 0.5,
+    nudge_x = 0.35,
+    size = 3.3,
+    fontface = "bold",
+    color = "#CD3333",
+    lineheight = 0.95
+  ) +
+  scale_x_continuous(breaks = seq(1985, 2025, 5), limits = c(1981, 2028)) +
+  scale_y_continuous(labels = label_number(suffix = " mm")) +
+  labs(
+    title = "Total July rainfall",
+    subtitle = "Monthly precipitation total; lower is drier and 2026 is highlighted in red.",
+    caption = "Hourly ERA5 archive for Bangalore"
+  ) +
+  analysis_theme()
+
+combined <- heat_panel / rain_panel +
+  plot_annotation(
+    title = "July 2026 was hot *and* dry by Bangalore standards",
+    subtitle = paste0(
+      "Historical July comparison from 1981-2026. 2026 ranks ",
+      current_july$rank_heat, "th hottest on mean daily maximum temperature and ",
+      current_july$rank_rain, "th driest on rainfall total."
+    ),
+    caption = "Hourly ERA5 archive for Bangalore"
+  )
+
+combined
+
+chart_path <- file.path(chart_dir, "july_2026_heat_rain.png")
+ggsave(chart_path, combined, width = 12, height = 8.5, dpi = 180, bg = "#e5e1d8")
+```
+
+## Checks
+
+```{r checks}
+list(
+  analysis_date = analysis_date,
+  july_2026_heat_rank = current_july$rank_heat,
+  july_2026_rain_rank = current_july$rank_rain,
+  july_2026_mean_tmax = current_july$mean_tmax,
+  july_2026_rain_total = current_july$rain_total,
+  july_2026_days_30 = current_july$days_30,
+  july_2026_days_31 = current_july$days_31,
+  july_2026_days_32 = current_july$days_32,
+  july_2026_days_33 = current_july$days_33,
+  july_2026_days_35 = current_july$days_35,
+  july_heat_rain_correlation = cor(july_stats$mean_tmax, july_stats$rain_total, use = "complete.obs"),
+  july_heat_rain_spearman = cor(july_stats$mean_tmax, july_stats$rain_total, use = "complete.obs", method = "spearman")
+)
+```
+
+## Verdict
+
+Insightful: no
+
+This July was genuinely rough: it was the **4th hottest** July in the archive on mean daily maximum temperature and the **5th driest** on rainfall. But the heat was more persistent than extreme — the hottest day only reached 30.68°C, and there were no 31°C+ or 33°C+ days — so the month reads as a warm, dry monsoon-month rather than a standout heatwave.
+
+That makes it a good factual summary, but not strong enough to publish as a site post. The result is descriptive rather than surprising, and the chart mostly confirms the ranking story in one glance.
+
+Charts:
+
+- `docs/assets/analysis/july_2026_heat_rain.png`
+
+Blog post:
+
+- not published
+- if this ever becomes publishable, create `docs/blog/july-2026-heat-rain.html`
+- include `This post is AI-written.` at the top of the article body
+- end with an `Original question` section containing `r rmarkdown::metadata$trigger_prompt`
+- add the post to the top of `docs/blog/index.html` and `docs/blog/feed.xml`
+- add `blog_url: "blog/july-2026-heat-rain.html"` to the top of `analysis_questions/analyses.yml`
