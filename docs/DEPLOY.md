@@ -135,6 +135,8 @@ Daily commentary is intentionally LLM-generated. The policy is:
 - Do not fall back to local/template prose if Claude fails. Weak fallback copy is worse than
   a failed run because it makes the site look fresher than the analysis really is.
 - Retry Claude a few times for transient API or wording-validation failures.
+- Validate bullets independently and keep valid unique bullets across retries, so one bad
+  bullet does not discard two usable ones.
 - Reject ambiguous recent-window wording. Rainy-day counts must say `last 14 days` or an
   exact date range, not bare phrasing such as `12 of 14 days`.
 - If Haiku cannot produce acceptable commentary, let the job fail loudly and inspect it.

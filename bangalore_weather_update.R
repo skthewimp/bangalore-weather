@@ -677,47 +677,54 @@ request_claude_commentary <- function(retry_note = NULL) {
   raw <- resp %>% resp_body_json() %>% .$content %>% .[[1]] %>% .$text
   lines <- strsplit(raw, "\n")[[1]]
   bullet_lines <- lines[grepl("^\u2022", trimws(lines))]
-  if (length(bullet_lines) == 0) {
-    stop("Claude returned no bullet lines. Raw response: ", raw)
+  if (length(bullet_lines) != 3) {
+    stop(
+      "Claude returned ", length(bullet_lines),
+      " bullet lines instead of 3. Raw response: ", raw
+    )
   }
 
   candidate <- paste(trimws(bullet_lines), collapse = "\n") %>%
     normalize_commentary_text() %>%
     polish_commentary_text()
-
-  validation_failures <- c(
-    if (has_ambiguous_window_text(candidate)) "ambiguous window wording" else NULL,
-    if (has_overstated_weather_text(candidate)) "overstated or inferred climate wording" else NULL
-  )
-
-  if (length(validation_failures) > 0) {
-    stop(
-      "Claude commentary failed validation: ",
-      paste(validation_failures, collapse = ", "),
-      ". Candidate: ",
-      candidate
-    )
-  }
-
   candidate
+}
+
+commentary_validation_failures <- function(text) {
+  c(
+    if (has_ambiguous_window_text(text)) "ambiguous window wording" else NULL,
+    if (has_overstated_weather_text(text)) "overstated or inferred climate wording" else NULL
+  )
 }
 
 commentary <- {
   last_error <- NULL
-  accepted <- NULL
+  accepted_lines <- character()
 
   for (attempt in seq_len(3)) {
-    retry_note <- if (attempt == 1 || is.null(last_error)) {
+    retry_note <- if (attempt == 1) {
       NULL
     } else {
       paste0(
-        "The previous attempt was rejected because: ",
-        last_error,
-        "\nRewrite from the same facts. Keep exactly three short bullets. Avoid the rejected wording."
+        if (!is.null(last_error)) {
+          paste0("The previous attempt had rejected wording: ", last_error, "\n")
+        } else {
+          ""
+        },
+        if (length(accepted_lines) > 0) {
+          paste0(
+            "These bullets are already accepted:\n",
+            paste(accepted_lines, collapse = "\n"),
+            "\nDo not repeat or paraphrase them. Choose different supported facts.\n"
+          )
+        } else {
+          ""
+        },
+        "Return exactly three new short bullets and avoid the rejected wording."
       )
     }
 
-    accepted <- tryCatch(
+    candidate <- tryCatch(
       request_claude_commentary(retry_note),
       error = function(e) {
         last_error <<- e$message
@@ -726,17 +733,47 @@ commentary <- {
       }
     )
 
-    if (!is.null(accepted) && nzchar(accepted)) {
-      message("Claude commentary accepted on attempt ", attempt, ".")
+    if (!is.null(candidate) && nzchar(candidate)) {
+      candidate_lines <- strsplit(candidate, "\n")[[1]] %>%
+        str_trim() %>%
+        discard(~ !nzchar(.x))
+
+      rejected <- map(candidate_lines, commentary_validation_failures)
+      valid_lines <- candidate_lines[lengths(rejected) == 0]
+      accepted_lines <- unique(c(accepted_lines, valid_lines))
+
+      rejected_messages <- map2_chr(
+        candidate_lines[lengths(rejected) > 0],
+        rejected[lengths(rejected) > 0],
+        ~ paste0(paste(.y, collapse = ", "), ": ", .x)
+      )
+
+      if (length(rejected_messages) > 0) {
+        last_error <- paste(rejected_messages, collapse = " | ")
+        message(
+          "Claude commentary attempt ", attempt, " kept ", length(valid_lines),
+          " valid bullet(s) and rejected ", length(rejected_messages), ": ",
+          last_error
+        )
+      } else {
+        last_error <- NULL
+      }
+    }
+
+    if (length(accepted_lines) >= 3) {
+      message("Claude commentary accepted after ", attempt, " attempt(s).")
       break
     }
   }
 
-  if (is.null(accepted) || !nzchar(accepted)) {
-    stop("Claude commentary failed after 3 attempts. Last error: ", last_error)
+  if (length(accepted_lines) < 3) {
+    stop(
+      "Claude commentary produced only ", length(accepted_lines),
+      " valid unique bullet(s) after 3 attempts. Last error: ", last_error
+    )
   }
 
-  accepted
+  paste(head(accepted_lines, 3), collapse = "\n")
 }
 
 
