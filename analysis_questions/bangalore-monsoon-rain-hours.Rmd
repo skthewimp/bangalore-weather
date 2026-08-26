@@ -1,0 +1,189 @@
+---
+title: "Bangalore rain has a 4pm habit"
+question: "Does it rain at specific hours of the day during monsoons in Bangalore, versus rest of the year?"
+trigger_prompt: "one weather question - does it rain at specific hours of the day during monsoons in bangalore, versus rest of the year?"
+slug: "bangalore-monsoon-rain-hours"
+date: "2026-06-25"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 150
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+
+rain_hourly <- blrRain %>%
+  filter(str_to_lower(Source) == "era5") %>%
+  transmute(
+    DT = as.POSIXct(DT, tz = "Asia/Kolkata"),
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  mutate(
+    month = month(DT),
+    hour = hour(DT),
+    season = if_else(month %in% c(6, 7, 8, 9), "Monsoon", "Rest"),
+    rainy = rain_mm > 0.1,
+    rainy_any = rain_mm > 0
+  )
+
+summary_by_hour <- rain_hourly %>%
+  summarise(
+    rainy_pct = mean(rainy) * 100,
+    mean_rain = mean(rain_mm),
+    .by = c(season, hour)
+  ) %>%
+  mutate(season = factor(season, levels = c("Rest", "Monsoon")))
+
+period_summary <- rain_hourly %>%
+  mutate(period = case_when(
+    hour %in% 0:5 ~ "Night (0-5)",
+    hour %in% 6:11 ~ "Morning (6-11)",
+    hour %in% 12:17 ~ "Afternoon (12-17)",
+    TRUE ~ "Evening (18-23)"
+  )) %>%
+  summarise(
+    rainy_pct = mean(rainy) * 100,
+    mean_rain = mean(rain_mm),
+    total_rain = sum(rain_mm),
+    .by = c(season, period)
+  ) %>%
+  mutate(
+    season = factor(season, levels = c("Rest", "Monsoon")),
+    period = factor(period, levels = c("Night (0-5)", "Morning (6-11)", "Afternoon (12-17)", "Evening (18-23)"))
+  )
+
+peak_hours <- summary_by_hour %>%
+  group_by(season) %>%
+  slice_max(rainy_pct, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+threshold_check <- rain_hourly %>%
+  summarise(rainy_any_pct = mean(rainy_any) * 100, .by = c(season, hour)) %>%
+  group_by(season) %>%
+  slice_max(rainy_any_pct, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  transmute(season, peak_hour_any = hour)
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## What the archive says
+
+The rain clock is real in both seasons, but it is much sharper in monsoon. The wettest hour is the same in both cases — **4pm** — yet the monsoon peak is more than twice as rainy as the rest of the year. In the monsoon window, about **55%** of 4pm hours are rainy; outside monsoon, it is about **21%**.
+
+That pattern is clearest in the afternoon. Monsoon afternoons (12-5pm) are rainy about **39.5%** of the time, versus **15.2%** in the rest of the year. Nights are much drier in both cases.
+
+```{r peak-table}
+peak_hours %>%
+  mutate(
+    rainy_pct = round(rainy_pct, 1),
+    mean_rain = round(mean_rain, 3)
+  )
+```
+
+```{r period-table}
+period_summary %>%
+  mutate(
+    rainy_pct = round(rainy_pct, 1),
+    mean_rain = round(mean_rain, 3),
+    total_rain = round(total_rain, 1)
+  )
+```
+
+## Chart
+
+```{r rain-hour-chart}
+chart_path <- file.path(chart_dir, "bangalore_monsoon_rain_diurnal.png")
+
+plot_data <- summary_by_hour %>%
+  mutate(season = fct_relevel(season, "Rest", "Monsoon"))
+
+p <- ggplot(plot_data, aes(x = hour, y = rainy_pct, color = season)) +
+  geom_line(linewidth = 1.1) +
+  geom_point(size = 1.7) +
+  geom_vline(xintercept = 16, linetype = "dashed", color = "#999999", linewidth = 0.4) +
+  geom_text(
+    data = peak_hours,
+    aes(label = paste0(round(rainy_pct, 1), "% at ", hour, ":00")),
+    nudge_y = 3,
+    size = 3.3,
+    fontface = "bold",
+    show.legend = FALSE
+  ) +
+  scale_x_continuous(breaks = seq(0, 23, 3), labels = paste0(seq(0, 23, 3), ":00")) +
+  scale_y_continuous(labels = label_percent(scale = 1), limits = c(0, 60)) +
+  scale_color_manual(values = c("Rest" = "#9c9280", "Monsoon" = "#228B22")) +
+  labs(
+    title = "Bangalore rain peaks in the late afternoon",
+    subtitle = "Share of ERA5 hours with >0.1 mm rain, 1981-2026. The 4pm peak is much stronger during June-September.",
+    x = NULL,
+    y = "Rainy hours",
+    caption = "Data: ERA5 via Oikolab"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+    axis.title = element_blank(),
+    axis.text = element_text(color = "#3C3C3C", face = "bold"),
+    plot.title = element_text(color = "#3C3C3C", face = "bold"),
+    plot.subtitle = element_text(color = "#666666"),
+    plot.caption = element_text(color = "#666666", size = rel(0.85)),
+    legend.title = element_blank(),
+    legend.position = "bottom"
+  )
+
+p
+
+ggsave(chart_path, p, width = 12, height = 6, dpi = 180, bg = "white")
+```
+
+## Sensitivity check
+
+The timing survives a looser rain definition too: if I count any rain at all (`> 0 mm`) instead of `> 0.1 mm`, the peak hour is still **4pm** in both seasons. The difference is mostly how often the afternoon gets wet, not a shift to some other part of the day.
+
+```{r threshold-check}
+threshold_check
+```
+
+## Verdict
+
+Insightful: yes
+
+The answer is a clear yes: Bangalore rain has a strong late-afternoon clock, and the monsoon version of that clock is much stronger than the rest of the year. That is enough to publish because it sharpens a plausible intuition with a simple, stable pattern across 45 years of hourly data. The story is not just "it rains more in monsoon"; it is "the wettest hours are concentrated around 4pm, and monsoon amplifies that concentration."
+
+Charts:
+
+- `docs/assets/analysis/bangalore_monsoon_rain_diurnal.png`
+
+Blog post:
+
+- publish `docs/blog/bangalore-monsoon-rain-hours.html`
+- add to `docs/blog/index.html`
+- add to `docs/blog/feed.xml`
+- add `blog_url: "blog/bangalore-monsoon-rain-hours.html"` to `analysis_questions/analyses.yml`

@@ -1,3 +1,17 @@
+- slug: bangalore-monsoon-rain-hours
+  publish: true
+  insightful: true
+  title: "Bangalore rain has a 4pm habit"
+  summary: "The late-afternoon rain clock exists all year, but monsoon makes it much stronger: about 55% of 4pm hours are rainy in monsoon versus about 21% outside it."
+  blog_url: "blog/bangalore-monsoon-rain-hours.html"
+  image: "assets/analysis/bangalore_monsoon_rain_diurnal.png"
+  image_width: 2160
+  image_height: 1080
+  image_alt: "Chart showing Bangalore rain peaks in the late afternoon, with a stronger monsoon peak around 4pm."
+  links:
+    - label: "Open rain clock chart"
+      href: "assets/analysis/bangalore_monsoon_rain_diurnal.png"
+
 - slug: dry-may-monsoon-signal
   publish: true
   insightful: true

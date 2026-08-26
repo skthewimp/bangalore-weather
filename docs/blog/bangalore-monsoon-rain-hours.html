@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bangalore rain has a 4pm habit - Bangalore Weather</title>
+<meta name="description" content="Bangalore rain peaks in the late afternoon, and monsoon makes that clock much stronger.">
+<link rel="canonical" href="https://weather.karthiks.co/blog/bangalore-monsoon-rain-hours.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="alternate" type="application/rss+xml" title="Bangalore Weather blog" href="feed.xml">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Bangalore rain has a 4pm habit">
+<meta property="og:description" content="The late-afternoon rain clock exists all year, but monsoon makes it much stronger.">
+<meta property="og:image" content="https://weather.karthiks.co/assets/analysis/bangalore_monsoon_rain_diurnal.png">
+<style>
+:root { --paper:#fffdf8; --ink:#3C3C3C; --muted:#666; --line:#cfc6b4; --teal:#005566; --weather-bg:#e5e1d8; --plum:#5f3946; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:var(--paper); font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; line-height:1.62; }
+a { color:var(--teal); text-decoration-thickness:1px; text-underline-offset:3px; }
+img { display:block; max-width:100%; height:auto; }
+.nav, article, footer { width:min(860px, calc(100vw - 32px)); margin:0 auto; }
+.nav { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:18px; border-bottom:1px solid var(--line); }
+.brand { color:var(--ink); font-weight:800; text-decoration:none; }
+.nav-links { display:flex; gap:16px; flex-wrap:wrap; font-size:.92rem; }
+.nav-links a { color:var(--ink); text-decoration:none; }
+header { background:var(--weather-bg); border-bottom:1px solid var(--line); }
+.hero { width:min(860px, calc(100vw - 32px)); margin:0 auto; padding:42px 0 34px; }
+.kicker { margin:0 0 10px; color:var(--plum); font-weight:800; font-size:.82rem; letter-spacing:.08em; text-transform:uppercase; }
+h1 { margin:0; font-size:clamp(2rem,4.8vw,3.5rem); line-height:1.08; }
+.lede { max-width:760px; margin:16px 0 0; font-size:1.08rem; }
+article { padding:34px 0 54px; }
+p { margin:0 0 18px; }
+figure { margin:28px 0; }
+figure img { border:1px solid var(--line); background:white; }
+figcaption { margin-top:8px; color:var(--muted); font-size:.9rem; }
+.ai-disclosure { margin:0 0 22px; padding:10px 12px; border-top:2px solid var(--line); border-bottom:1px solid var(--line); color:var(--muted); font-size:.92rem; }
+ul { margin:0 0 18px 20px; }
+li { margin-bottom:8px; }
+.original-question { margin-top:28px; padding-top:18px; border-top:1px solid var(--line); }
+.original-question h2 { margin:0 0 10px; font-size:1.05rem; }
+footer { padding:24px 0 36px; border-top:1px solid var(--line); color:var(--muted); font-size:.92rem; }
+@media (max-width:720px){ .nav{align-items:flex-start; flex-direction:column; padding:14px 0;} }
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Main navigation"><a class="brand" href="../">Bangalore Weather</a><div class="nav-links"><a href="./">Blog</a><a href="../#archive">Years</a><a href="../#data">Data</a><a href="https://karthiks.co/">Karthik</a></div></nav>
+<header><div class="hero"><p class="kicker">Analysis</p><h1>Bangalore rain has a 4pm habit</h1><p class="lede">The late-afternoon rain clock exists all year. The monsoon just turns the dial up.</p></div></header>
+<article>
+  <p class="ai-disclosure">This post is AI-written.</p>
+  <p>There are a few Bangalore weather beliefs that almost everyone seems to share, even if we do not usually write them down. One of them is that rain likes the late afternoon. I wanted to know if that was just a memory of memorable storms, or if the hourly archive actually shows a pattern.</p>
+  <p>It does. Looking across the local ERA5 archive from 1981-2026, the rainy-hour share peaks around <strong>4pm</strong> in both seasons I checked. But the monsoon version of that clock is much stronger. At the peak hour, roughly <strong>55%</strong> of monsoon 4pm hours are rainy, versus about <strong>21%</strong> outside monsoon.</p>
+  <figure><img src="../assets/analysis/bangalore_monsoon_rain_diurnal.png" width="2160" height="1080" alt="Chart showing Bangalore rain peaks in the late afternoon, with a stronger monsoon peak around 4pm."><figcaption>The late-afternoon peak exists all year, but monsoon makes it far more pronounced.</figcaption></figure>
+  <p>The useful part is not just the peak hour. The whole afternoon behaves differently. Monsoon afternoons (12-5pm) are rainy about <strong>39.5%</strong> of the time, while the rest of the year they are rainy about <strong>15.2%</strong> of the time. Nights are much drier in both cases. So yes: Bangalore rain has a clock, and it is a very afternoon-shaped clock.</p>
+  <p>That also keeps the monsoon story from being too simplistic. It is not just "more rain". It is "more rain, concentrated into the part of the day when the city has already heated up and convective storms are easiest to trigger." That is why monsoon rain can feel so predictable in one sense and still so disruptive in another: it shows up right when the day is already in motion.</p>
+  <p>One small sensitivity check held up too. If I loosen the definition and count any rain at all, the peak hour stays 4pm in both seasons. So this is not an artefact of a threshold choice; it is a real daily rhythm.</p>
+  <section class="original-question"><h2>Original question</h2>
+    <p>one weather question - does it rain at specific hours of the day during monsoons in bangalore, versus rest of the year?</p>
+  </section>
+</article>
+<footer><a href="./">Back to blog</a> / <a href="https://karthiks.co/">Karthik Shashidhar</a></footer>
+</body>
+</html>
