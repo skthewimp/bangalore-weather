@@ -1,3 +1,18 @@
+- slug: september-rain-intensity
+  publish: true
+  insightful: true
+  date: "2026-09-08"
+  title: "Bangalore rain gets heavier in the second half of May and September"
+  summary: "September's rainy days are a little heavier than July and August, but the half-month view is more interesting: May and September both strengthen late in the month."
+  blog_url: "blog/september-rain-intensity.html"
+  image: "assets/analysis/september-rain-intensity.png"
+  image_width: 2340
+  image_height: 1044
+  image_alt: "Two-panel chart comparing median rainy-day rainfall for full months and the first and second halves of May through September in Bangalore."
+  links:
+    - label: "Open rain intensity chart"
+      href: "assets/analysis/september-rain-intensity.png"
+
 - slug: bangalore-monsoon-rain-hours
   publish: true
   insightful: true

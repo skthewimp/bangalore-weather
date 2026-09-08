@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bangalore Weather</title>
 <meta name="description" content="Daily Bangalore weather charts and analysis using hourly temperature, rainfall, and wind data from 1981 onward.">
-<meta name="author" content="Karthik">
+<meta name="author" content="Karthik Shashidhar">
 <meta name="theme-color" content="#e5e1d8">
 <link rel="canonical" href="https://weather.karthiks.co/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -34,7 +34,8 @@
   "url": "https://weather.karthiks.co/",
   "creator": {
     "@type": "Person",
-    "name": "Karthik"
+    "name": "Karthik Shashidhar",
+    "url": "https://karthiks.co/"
   },
   "temporalCoverage": "1981/..",
   "spatialCoverage": {
@@ -532,6 +533,7 @@ h2 a {
       <a href="#archive">Years</a>
       <a href="#requests">Questions</a>
       <a href="#data">Data</a>
+      <a href="https://karthiks.co/">Karthik</a>
     </div>
   </nav>
 </header>
@@ -595,6 +597,22 @@ h2 a {
       <div class="analysis-list">
         <!-- ANALYSES:START -->
         <article class="analysis-item">
+          <a href="blog/september-rain-intensity.html" aria-label="Read blog post: Bangalore rain gets heavier in the second half of May and September">
+            <img src="assets/analysis/september-rain-intensity.png" width="2340" height="1044" loading="lazy" alt="Two-panel chart comparing median rainy-day rainfall for full months and the first and second halves of May through September in Bangalore.">
+          </a>
+          <div>
+            <a class="analysis-copy-link" href="blog/september-rain-intensity.html">
+              <h3>Bangalore rain gets heavier in the second half of May and September</h3>
+              <p>
+                September's rainy days are a little heavier than July and August, but the half-month view is more interesting: May and September both strengthen late in the month.
+              </p>
+            </a>
+            <div class="links">
+              <a href="assets/analysis/september-rain-intensity.png">Open rain intensity chart</a>
+            </div>
+          </div>
+        </article>
+        <article class="analysis-item">
           <a href="blog/bangalore-monsoon-rain-hours.html" aria-label="Read blog post: Bangalore rain has a 4pm habit">
             <img src="assets/analysis/bangalore_monsoon_rain_diurnal.png" width="2160" height="1080" loading="lazy" alt="Chart showing Bangalore rain peaks in the late afternoon, with a stronger monsoon peak around 4pm.">
           </a>
@@ -624,23 +642,6 @@ h2 a {
             <div class="links">
               <a href="assets/analysis/dry_may_2026_rainfall_rank.png">Open dry-year chart</a>
               <a href="assets/analysis/early_may_rain_monsoon_signal.png">Open monsoon signal chart</a>
-            </div>
-          </div>
-        </article>
-        <article class="analysis-item">
-          <a href="blog/pre-monsoon-evening-rain.html" aria-label="Read blog post: Pre-monsoon rain is an evening creature">
-            <img src="assets/analysis/bangalore_rain_diurnal_by_season.png" width="3300" height="1800" loading="lazy" alt="Chart showing Bangalore pre-monsoon rain concentrated in the late afternoon and early evening.">
-          </a>
-          <div>
-            <a class="analysis-copy-link" href="blog/pre-monsoon-evening-rain.html">
-              <h3>Pre-monsoon rain is an evening creature</h3>
-              <p>
-                April-May rain barely exists before afternoon, then climbs hard into the 5-6pm slot. The southwest monsoon still has an afternoon bump, but it is less fussy about the clock.
-              </p>
-            </a>
-            <div class="links">
-              <a href="assets/analysis/bangalore_rain_diurnal_by_season.png">Open diurnal chart</a>
-              <a href="assets/analysis/bangalore_rain_river.png">Open rain-through-year chart</a>
             </div>
           </div>
         </article>
@@ -751,7 +752,7 @@ h2 a {
 
 <footer class="site-footer">
   <div class="footer-inner">
-    <span>Bangalore Weather by Karthik</span>
+    <span>Bangalore Weather by <a href="https://karthiks.co/">Karthik Shashidhar</a></span>
     <span><a href="feed.xml">Weather RSS</a> / <a href="blog/feed.xml">Blog RSS</a> / <a href="https://github.com/skthewimp/bangalore-weather">Source</a></span>
   </div>
 </footer>

@@ -1,52 +1,214 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Bangalore Weather Blog</title>
     <link>https://weather.karthiks.co/blog/</link>
     <description>Short Bangalore weather analysis posts from the long-running hourly archive.</description>
     <language>en</language>
-    <lastBuildDate>Thu, 25 Jun 2026 00:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Tue, 08 Sep 2026 00:00:00 GMT</lastBuildDate>
+    <item>
+      <title>Bangalore rain gets heavier in the second half of May and September</title>
+      <link>https://weather.karthiks.co/blog/september-rain-intensity.html</link>
+      <guid>https://weather.karthiks.co/blog/september-rain-intensity.html</guid>
+      <pubDate>Tue, 08 Sep 2026 00:00:00 GMT</pubDate>
+      <description>September's rainy days are a little heavier than July and August, but the half-month view is more interesting: May and September both strengthen late in the month.</description>
+      <content:encoded><![CDATA[<p class="ai-disclosure">This post is AI-written.</p>
+
+
+<p>I started with a fairly narrow question: are September rains in Bangalore heavier than July and August rains? “Heavier” needs a definition here, so I used the median rain on a day with more than 1 mm of rain. That deliberately separates the size of a typical rainy day from the question of how often it rains.</p>
+
+
+<p>Across complete years from 1981 through 2025, September's rainy-day median is <strong>5.00 mm</strong>. That is a little above July's 4.20 mm and August's 4.39 mm. It is not a dramatic difference, though. September is also below May, whose median is 5.43 mm. June is the low point of this particular comparison at 3.79 mm.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/september-rain-intensity.png" width="2340" height="1044" alt="Two-panel bar chart comparing median rainy-day rainfall for full months and the first and second halves of May through September in Bangalore."><figcaption>The full-month comparison and the half-month comparison are separated because a 15-day window should not be ranked as if it were a whole month.</figcaption></figure>
+<p>The half-month view is where the small pattern appears. May's second half has the highest median of all the windows at <strong>5.78 mm</strong>. September's second half is next at <strong>5.54 mm</strong>, up from 4.50 mm in the first half. July and August also edge up in their second halves, while June goes the other way: 4.20 mm in the first half, then 3.56 mm.</p>
+
+
+<p>So the answer is not quite “September is the intense rain month”. It is more like: <strong>rain gets heavier late in May and late in September, while the middle monsoon months are steadier and slightly less intense per rainy day.</strong> That is a more useful seasonal shape than the full-month ranking alone.</p>
+
+
+<p>There is an important counterpoint. July and August have more rainy days than September: roughly 68% and 63% of days exceed 1 mm, compared with 57% in September. A typical September rainy day is a little heavier, but rain is less frequent. Intensity and frequency are telling different parts of the story.</p>
+
+
+<p>This is descriptive rather than causal. The archive can show the shape of the seasonal distribution; it cannot, by itself, tell us whether the late-month changes come from storm type, circulation, or some other mechanism. Still, it is a nice reminder that “monsoon” is not one uniform block on the calendar.</p>
+
+
+<section class="original-question"><h2>Original question</h2>
+<p>Are September rains in bangalore more intense in general than July and August rains ? Measure intensity in terms of median rain on a rainy ( &gt;1mm rain) day.<br><br>What if we split September into two halves ? How does this look ? And if we bring May and June also into comparison</p></section>]]></content:encoded>
+    </item>
     <item>
       <title>Bangalore rain has a 4pm habit</title>
       <link>https://weather.karthiks.co/blog/bangalore-monsoon-rain-hours.html</link>
       <guid>https://weather.karthiks.co/blog/bangalore-monsoon-rain-hours.html</guid>
       <pubDate>Thu, 25 Jun 2026 00:00:00 GMT</pubDate>
-      <description>This post is AI-written. The late-afternoon rain clock exists all year, but monsoon makes it much stronger.</description>
+      <description>The late-afternoon rain clock exists all year, but monsoon makes it much stronger: about 55% of 4pm hours are rainy in monsoon versus about 21% outside it.</description>
+      <content:encoded><![CDATA[<p class="ai-disclosure">This post is AI-written.</p>
+
+
+<p>There are a few Bangalore weather beliefs that almost everyone seems to share, even if we do not usually write them down. One of them is that rain likes the late afternoon. I wanted to know if that was just a memory of memorable storms, or if the hourly archive actually shows a pattern.</p>
+
+
+<p>It does. Looking across the local ERA5 archive from 1981-2026, the rainy-hour share peaks around <strong>4pm</strong> in both seasons I checked. But the monsoon version of that clock is much stronger. At the peak hour, roughly <strong>55%</strong> of monsoon 4pm hours are rainy, versus about <strong>21%</strong> outside monsoon.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/bangalore_monsoon_rain_diurnal.png" width="2160" height="1080" alt="Chart showing Bangalore rain peaks in the late afternoon, with a stronger monsoon peak around 4pm."><figcaption>The late-afternoon peak exists all year, but monsoon makes it far more pronounced.</figcaption></figure>
+<p>The useful part is not just the peak hour. The whole afternoon behaves differently. Monsoon afternoons (12-5pm) are rainy about <strong>39.5%</strong> of the time, while the rest of the year they are rainy about <strong>15.2%</strong> of the time. Nights are much drier in both cases. So yes: Bangalore rain has a clock, and it is a very afternoon-shaped clock.</p>
+
+
+<p>That also keeps the monsoon story from being too simplistic. It is not just "more rain". It is "more rain, concentrated into the part of the day when the city has already heated up and convective storms are easiest to trigger." That is why monsoon rain can feel so predictable in one sense and still so disruptive in another: it shows up right when the day is already in motion.</p>
+
+
+<p>One small sensitivity check held up too. If I loosen the definition and count any rain at all, the peak hour stays 4pm in both seasons. So this is not an artefact of a threshold choice; it is a real daily rhythm.</p>
+
+
+<section class="original-question"><h2>Original question</h2>
+    <p>one weather question - does it rain at specific hours of the day during monsoons in bangalore, versus rest of the year?</p>
+  </section>]]></content:encoded>
     </item>
     <item>
       <title>Bangalore is dry. That does not make early May a monsoon oracle.</title>
       <link>https://weather.karthiks.co/blog/dry-may-monsoon-signal.html</link>
       <guid>https://weather.karthiks.co/blog/dry-may-monsoon-signal.html</guid>
-      <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
-      <description>This post is AI-written. 2026 is genuinely dry so far, but first-half May rain has almost no local relationship with June-September rain.</description>
+      <pubDate>Thu, 28 May 2026 00:00:00 GMT</pubDate>
+      <description>2026 is genuinely dry so far: third-driest through May 23 in the local archive. But first-half May rain has almost no relationship with June-September rain.</description>
+      <content:encoded><![CDATA[<p class="ai-disclosure">This post is AI-written.</p>
+
+
+<p>This started as a very normal Bangalore weather complaint: it feels like the year has been dry. Not just "we have not had a dramatic storm this week" dry, but the slightly unsettling version where the whole pre-monsoon season feels absent.</p>
+
+
+<p>The data agrees. Through May 23, 2026, Bangalore has recorded 63.7 mm of rain in this archive. In the 1981-2026 comparison, that is the third-driest year-to-date total. April 1-May 23 is also third-driest. The first half of May is even starker: 3.4 mm, again third-driest out of 46 years.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/dry_may_2026_rainfall_rank.png" width="2160" height="1080" alt="Chart showing 2026 as one of Bangalore's driest years through May 23, especially in the first half of May."><figcaption>2026 sits deep in the dry tail for the year so far. Rain after May 18 softened the May-to-date rank, but not the broader pre-monsoon picture.</figcaption></figure>
+<p>So the first answer is simple: yes, this is unusual. The current year is not merely a vibes-based dry spell. It is in the bottom few years of the local daily archive for several sensible cuts of the pre-monsoon season.</p>
+
+
+<p>The second answer is less satisfying, but more useful. A dry first half of May does not tell us much about the coming local monsoon. Using June-September rainfall as the monsoon total, first-half May rain has almost no relationship with the season that follows. The Pearson correlation is -0.11. The Spearman rank correlation is -0.05. That is basically a shrug in chart form.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/early_may_rain_monsoon_signal.png" width="2160" height="1080" alt="Scatterplot showing little relationship between Bangalore rain from May 1-15 and rain from June 1-September 30."><figcaption>The near-zero early-May years split both ways. 1987 stayed dry in the monsoon window; 2020 turned very wet.</figcaption></figure>
+<p>The closest analogs are a good warning against over-reading the signal. In 1987, first-half May rain was 3.3 mm and the June-September total was only 331.9 mm. In 2020, first-half May rain was even lower, just 0.5 mm, and the monsoon total was 684.2 mm. Same dry opening. Opposite endings.</p>
+
+
+<p>That does not mean 2026 will be fine. It only means this particular local clue is weak. Pre-monsoon thunderstorms and the southwest monsoon are not the same machine with the same clock. Early May can fail for reasons that do not decide June, July, August, and September.</p>
+
+
+<p>My read: the dry-season complaint is valid. The monsoon omen is not. If you want to worry about the monsoon, use actual monsoon forecasts and circulation signals. Do not put too much weight on whether Bangalore got its usual early-May evening drama.</p>
+
+
+<section class="original-question"><h2>Original question</h2>
+    <p>this year seems to be incredibly dry. not much rain at all so far (we're on may24 now). How common is this? and what does low rain in the first half of May imply for the overall monsoon?</p>
+  </section>]]></content:encoded>
     </item>
     <item>
       <title>Pre-monsoon rain is an evening creature</title>
       <link>https://weather.karthiks.co/blog/pre-monsoon-evening-rain.html</link>
       <guid>https://weather.karthiks.co/blog/pre-monsoon-evening-rain.html</guid>
       <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
-      <description>This post is AI-written. April-May rain barely exists before afternoon, then climbs hard into the 5-6pm slot.</description>
+      <description>April-May rain barely exists before afternoon, then climbs hard into the 5-6pm slot. The southwest monsoon still has an afternoon bump, but it is less fussy about the clock.</description>
+      <content:encoded><![CDATA[<p class="ai-disclosure">This post is AI-written.</p>
+
+
+<p>If you live in Bangalore, you probably know this pattern without having graphed it. A hot April or May day builds up. The sky gets theatrical in the afternoon. Then sometime around commute hour, the city gets its short, dramatic release. I wanted to see whether the hourly archive agreed with that memory.</p>
+
+
+<p>It does, almost too neatly. April-May rain barely exists before afternoon. Through the morning and early afternoon, the line stays close to zero. Then it climbs hard into the 5-6pm slot before tapering off again by night. This is not rain spread politely across the day. It is a late-day event.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/bangalore_rain_diurnal_by_season.png" width="3300" height="1800" alt="Chart showing Bangalore pre-monsoon rain concentrated in the late afternoon and early evening."><figcaption>Pre-monsoon rain has the sharpest daily clock: near-zero through the morning, then a late-afternoon spike.</figcaption></figure>
+<p>The southwest monsoon also has an afternoon bump, but it is less fussy about the clock. It rains through more of the day and night, which makes sense if you think of it as sustained monsoon flow rather than a local thunderstorm needing the day to heat up first. The northeast monsoon is broader still. The seasons do not just differ in how much rain they bring; they differ in the rhythm of the day.</p>
+
+
+<p>This is one of those small findings that makes the weather feel more legible. The pre-monsoon shower is not just a smaller monsoon. It has different physics and a different schedule. It needs the city to cook for a while. Then, if the moisture and instability line up, the rain arrives in a tight window.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/bangalore_rain_river.png" width="3300" height="2100" alt="Chart showing Bangalore rainfall through the year decomposed by wind direction."><figcaption>The yearly rain pattern has two broad peaks, but the daily clock inside each season is different.</figcaption></figure>
+<p>The practical implication is ordinary but useful: April-May rain is bad at being a morning plan and good at ruining evening traffic. It also explains why these showers feel so tied to relief from heat. They arrive right after the worst part of the day, when the city has had enough.</p>
+
+]]></content:encoded>
     </item>
     <item>
       <title>The wind has a cleaner seasonal story than I expected</title>
       <link>https://weather.karthiks.co/blog/seasonal-wind-shift.html</link>
       <guid>https://weather.karthiks.co/blog/seasonal-wind-shift.html</guid>
       <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
-      <description>This post is AI-written. Bangalore flips from winter easterlies to late-May and monsoon westerlies.</description>
+      <description>From December through March, easterlies dominate. By late May, the city has flipped toward westerlies. The southwest monsoon is the cleanest signal in the dataset.</description>
+      <content:encoded><![CDATA[<p class="ai-disclosure">This post is AI-written.</p>
+
+
+<p>I had been pulling Bangalore temperature and rain for a while before adding wind. The first thing I tried was the obvious one: wind roses by month. It was technically fine and visually annoying. Twelve little polar plots, lots of spokes, no real sense of movement through the year.</p>
+
+
+<p>The better question was simpler. Across the year, where does the wind come from? I weighted each hour by wind speed, because a faint easterly and a strong westerly should not count the same. That gave me a river chart, and the seasonal pattern was cleaner than I expected.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/bangalore_wind_river.png" width="3600" height="2100" alt="Chart showing Bangalore winds shift from winter easterlies to late-May and monsoon westerlies."><figcaption>Winter and early summer are dominated by easterlies. By late May the city has flipped toward westerlies.</figcaption></figure>
+<p>From December through March, easterlies dominate. By late May, the wind has turned. June through September is overwhelmingly westerly, which is exactly the southwest monsoon announcing itself in the data. October is messy, which feels right. November starts handing the city back to the easterlies.</p>
+
+
+<p>The rain side is even more revealing. Pre-monsoon rain is messy in origin. Westerlies bring the largest single share, but a meaningful chunk comes from the eastern half of the compass too. That fits the character of April-May storms: local convective events that build out of hot afternoons rather than a single large-scale conveyor belt.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/bangalore_rain_by_season_and_wind.png" width="3300" height="2100" alt="Chart showing Bangalore rainfall by season decomposed by wind direction."><figcaption>The southwest monsoon is the clean signal: most June-September rain arrives with westerly winds.</figcaption></figure>
+<p>The southwest monsoon is different. Most June-September rain falls with wind from the west, and if you add the southwest and northwest sectors, the dominance is hard to miss. This is the one-engine season. The October-November rain is the nice complication. We call it the northeast monsoon, and easterlies do matter, but the westerlies do not simply vanish on schedule. The monsoon does not leave like a school bell rang. It dribbles out.</p>
+
+]]></content:encoded>
     </item>
     <item>
       <title>Bangalore summers are getting hotter, but mostly at night</title>
       <link>https://weather.karthiks.co/blog/bangalore-summers-hotter.html</link>
       <guid>https://weather.karthiks.co/blog/bangalore-summers-hotter.html</guid>
       <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
-      <description>This post is AI-written. The clearer signal is warmer nights, a shrinking daily high-low range, and bigger hot-day spikes.</description>
+      <description>The average summer afternoon high is nearly flat from 1981-2025. The clearer signal is warmer nights, a shrinking daily high-low range, and bigger spikes in days above 35 deg C.</description>
+      <content:encoded><![CDATA[<p class="ai-disclosure">This post is AI-written.</p>
+
+
+<p>The usual Bangalore summer argument has a very specific shape. Someone says it never used to cross 35 deg C. Someone else says it always did, we just complain more now. Both sides are usually remembering a few bad weeks and converting them into climate history.</p>
+
+
+<p>So I pulled March-May daily highs and lows from 1981 through 2025 and asked the boring version of the question: what has actually moved? The answer surprised me a little. Average summer afternoon highs are nearly flat. There is not a large, clean upward slope in the mean maximum temperature. If you only look at that line, the "summers are getting hotter" claim looks weaker than the public mood around it.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/bangalore_summer_warming.png" width="2160" height="1620" alt="Chart showing Bangalore summer highs are nearly flat while summer lows are rising and hot-day spikes are larger."><figcaption>The headline signal is warmer nights, a narrower daily range, and larger spikes in very hot days.</figcaption></figure>
+<p>But that is the wrong place to stop. The lows have moved up more clearly. Nights are warmer. The daily high-low range is shrinking. That matters because heat is not only a 3pm experience. It is also whether the house cools down overnight, whether sleep feels sticky, and whether the next day starts from a slightly worse baseline.</p>
+
+
+<p>The other thing that has changed is the shape of the extremes. Days at or above 35 deg C have not become a smooth staircase, but the spikes are bigger. Some recent summers throw up far more hot days than the old baseline would lead you to expect. That is probably what people are reacting to when they say summer has changed: not every day is hotter, but the bad stretches can be sharper and harder to ignore.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/bangalore_weather_2024.png" width="4050" height="2250" alt="Bangalore 2024 weather chart with record heat and wet August."><figcaption>2024 is a useful reminder that the felt story of summer often comes from clusters and records, not just seasonal averages.</figcaption></figure>
+<p>This is why I do not like the clean nostalgic version of the claim. "Bangalore summer is hotter now" is directionally fair, but too blunt. A better version is: nights have warmed, the daily cooling window has narrowed, and hot-day spikes have become more prominent. That is less tweetable. It is also closer to what the chart is saying.</p>
+
+]]></content:encoded>
     </item>
     <item>
       <title>Do summer showers actually cool Bangalore?</title>
       <link>https://weather.karthiks.co/blog/summer-showers-cooling.html</link>
       <guid>https://weather.karthiks.co/blog/summer-showers-cooling.html</guid>
       <pubDate>Sun, 24 May 2026 00:00:00 GMT</pubDate>
-      <description>This post is AI-written. Rainy afternoons start cooler, end cooler, and still have a proper post-rain drop.</description>
+      <description>The short answer is yes, but not in the simplistic way people usually mean it. Rainy afternoons start cooler, end cooler, and still have a proper post-rain drop. The effect changes across April and May.</description>
+      <content:encoded><![CDATA[<p class="ai-disclosure">This post is AI-written.</p>
+
+
+<p>I asked this because the folk version of the claim is a little too neat. Bangalore gets hot in April and May, a shower rolls through, and suddenly everyone says the city has been rescued. That is emotionally true. I wanted to know if it was also visible in the hourly data.</p>
+
+
+<p>The first pass says yes, but not in the cartoon version where a hot afternoon simply gets switched off by rain. Rainy afternoons are already different before the first drop lands. They start cooler than dry afternoons, probably because the same cloud build-up that makes rain possible has already cut some of the heat. In the sample I looked at, dry afternoons peaked around 33.2 deg C, while rainy afternoons peaked closer to 31.4 deg C.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/summer_showers_cooling.png" width="1650" height="825" alt="Chart showing Bangalore summer showers cool rainy afternoons and produce a visible post-rain temperature drop."><figcaption>Rainy afternoons are cooler before and after the shower, with an extra evening drop still visible.</figcaption></figure>
+<p>Then comes the actual shower effect. On dry days, Bangalore naturally cools into evening anyway. That matters, because otherwise we over-credit rain for something the sun was going to do for free. The dry-day peak-to-evening drop was about 7.3 deg C. Rainy afternoons dropped about 8.0 deg C. So the extra cooling from rain, after accounting for ordinary diurnal cooling, is closer to 0.7 deg C than the dramatic number people may have in mind.</p>
+
+
+<p>But I would not dismiss that as small. The compounded effect is what you feel. A rainy afternoon starts lower, avoids the worst peak, and then lands at a much more comfortable evening temperature. Peak heat is shaved by roughly 1.8 deg C, evening temperature by roughly 2.6 deg C. That is not just a statistical footnote when you are sitting in a west-facing room at 5pm.</p>
+
+
+<figure><img src="https://weather.karthiks.co/assets/analysis/summer_showers_frequency.png" width="1650" height="825" alt="Chart showing how Bangalore summer shower frequency varies through April and May."><figcaption>The cooling story also changes across April and May, because shower timing and frequency are not constant.</figcaption></figure>
+<p>The month matters too. Early April showers are not the same thing as late-May showers. The pre-monsoon season is a transition, not a block. That is the part I want to keep digging into, because the public memory of summer is usually one blurry bucket: April was hot, May was wet, Bangalore used to be nicer. The data is more annoying, and therefore more interesting.</p>
+
+]]></content:encoded>
     </item>
   </channel>
 </rss>

@@ -1,0 +1,173 @@
+---
+title: "Is September rain more intense in Bangalore?"
+question: "Are September rains in bangalore more intense in general than July and August rains ? Measure intensity in terms of median rain on a rainy ( >1mm rain) day. \n\nWhat if we split September into two halves ? How does this look ? And if we bring May and June also into comparison"
+trigger_prompt: "Are September rains in bangalore more intense in general than July and August rains ? Measure intensity in terms of median rain on a rainy ( >1mm rain) day. \n\nWhat if we split September into two halves ? How does this look ? And if we bring May and June also into comparison"
+slug: "september-rain-intensity"
+date: "2026-09-08"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 10, fig.height = 5.5, dpi = 150)
+library(tidyverse)
+library(lubridate)
+library(scales)
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+theme_weather <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(plot.background = element_rect(fill = "white", color = NA),
+          panel.background = element_rect(fill = "white", color = NA),
+          panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_blank(),
+          panel.grid.major.y = element_line(color = "grey88", linewidth = 0.3),
+          axis.title = element_blank(), axis.text = element_text(color = "#3C3C3C", face = "bold"),
+          plot.title = element_text(color = "#3C3C3C", face = "bold"),
+          plot.subtitle = element_text(color = "#666666"),
+          plot.caption = element_text(color = "#666666", size = rel(0.85)),
+          legend.position = "none")
+}
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Data and definitions
+
+The analysis uses the local daily Bangalore archive, which is derived from the project's ERA5 weather data. I restrict the comparison to complete calendar years 1981--2025; the current 2026 rows are incomplete and are not used.
+
+- A rainy day means daily rain **strictly greater than 1 mm**.
+- Intensity means the median daily rain among rainy days in the period.
+- The main summaries pool all qualifying rainy days across the complete years. Each period has the same number of observations per year, apart from May having 31 days and the other monthly windows having 30 (and September halves having 15), so this does not overweight any year within a comparison window.
+
+```{r data-prep}
+daily <- read_csv(file.path(root_dir, "docs", "data", "bangalore_daily_weather.csv"), show_col_types = FALSE) %>%
+  transmute(date = as.Date(DT), rain_mm = as.numeric(Rain)) %>%
+  filter(year(date) <= 2025, !is.na(rain_mm)) %>%
+  mutate(
+    year = year(date), month = month(date), day = day(date),
+    period = case_when(
+      month == 5 & day <= 15 ~ "May 1–15",
+      month == 5 & day >= 16 ~ "May 16–31",
+      month == 6 & day <= 15 ~ "June 1–15",
+      month == 6 & day >= 16 ~ "June 16–30",
+      month == 7 & day <= 15 ~ "July 1–15",
+      month == 7 & day >= 16 ~ "July 16–31",
+      month == 8 & day <= 15 ~ "August 1–15",
+      month == 8 & day >= 16 ~ "August 16–31",
+      month == 9 & day <= 15 ~ "September 1–15",
+      month == 9 & day >= 16 ~ "September 16–30",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(period))
+
+period_order <- c("May 1–15", "May 16–31", "June 1–15", "June 16–30",
+                  "July 1–15", "July 16–31", "August 1–15", "August 16–31",
+                  "September 1–15", "September 16–30")
+summary_tbl <- daily %>%
+  group_by(period) %>%
+  summarise(
+    days = n(), rainy_days = sum(rain_mm > 1),
+    rainy_share = rainy_days / days,
+    median_rain_mm = median(rain_mm[rain_mm > 1]),
+    mean_rain_mm = mean(rain_mm[rain_mm > 1]),
+    p75_rain_mm = quantile(rain_mm[rain_mm > 1], 0.75),
+    .groups = "drop"
+  ) %>%
+  mutate(period = factor(period, levels = period_order)) %>%
+  arrange(period)
+
+summary_tbl
+```
+
+## First, the month comparison
+
+```{r month-summary}
+month_tbl <- daily %>%
+  mutate(month_name = month(date, label = TRUE, abbr = FALSE)) %>%
+  filter(month %in% 5:8) %>%
+  group_by(month_name) %>%
+  summarise(days = n(), rainy_days = sum(rain_mm > 1), rainy_share = rainy_days / days,
+            median_rain_mm = median(rain_mm[rain_mm > 1]),
+            mean_rain_mm = mean(rain_mm[rain_mm > 1]),
+            p75_rain_mm = quantile(rain_mm[rain_mm > 1], 0.75), .groups = "drop") %>%
+  mutate(period = as.character(month_name)) %>%
+  select(period, everything(), -month_name)
+september_tbl <- daily %>% filter(month == 9) %>%
+  summarise(days = n(), rainy_days = sum(rain_mm > 1), rainy_share = rainy_days / days,
+            median_rain_mm = median(rain_mm[rain_mm > 1]),
+            mean_rain_mm = mean(rain_mm[rain_mm > 1]),
+            p75_rain_mm = quantile(rain_mm[rain_mm > 1], 0.75)) %>%
+  mutate(period = "September")
+comparison_tbl <- bind_rows(month_tbl, september_tbl) %>%
+  select(period, everything())
+comparison_tbl
+```
+
+September's pooled rainy-day median is `r round(september_tbl$median_rain_mm, 2)` mm. That is `r round(september_tbl$median_rain_mm - month_tbl$median_rain_mm[month_tbl$period == "July"], 2)` mm above July and `r round(september_tbl$median_rain_mm - month_tbl$median_rain_mm[month_tbl$period == "August"], 2)` mm above August, but below May by `r round(month_tbl$median_rain_mm[month_tbl$period == "May"] - september_tbl$median_rain_mm, 2)` mm.
+
+## Half-month view
+
+```{r half-month-chart}
+month_plot <- daily %>%
+  mutate(month_name = month(date, label = TRUE, abbr = FALSE)) %>%
+  filter(month %in% 5:9) %>%
+  group_by(month_name) %>%
+  summarise(median_rain_mm = median(rain_mm[rain_mm > 1]), .groups = "drop") %>%
+  mutate(panel = "Full months", label = as.character(month_name),
+         label = factor(label, levels = c("May", "June", "July", "August", "September")))
+half_plot <- summary_tbl %>%
+  filter(as.character(period) %in% period_order) %>%
+  transmute(label = factor(as.character(period), levels = period_order),
+            median_rain_mm, panel = "All half-months")
+plot_tbl <- bind_rows(month_plot, half_plot) %>%
+  mutate(panel = factor(panel, levels = c("Full months", "All half-months")))
+
+chart_path <- file.path(chart_dir, "september-rain-intensity.png")
+p <- ggplot(plot_tbl, aes(label, median_rain_mm)) +
+  geom_col(fill = "#146B8C", width = 0.68) +
+  geom_text(aes(label = paste0(number(median_rain_mm, accuracy = 0.01), " mm")),
+            vjust = -0.45, fontface = "bold", color = "#3C3C3C", size = 3.2) +
+  facet_wrap(~ panel, scales = "free_x", nrow = 1) +
+  scale_y_continuous(labels = label_number(suffix = " mm"), expand = expansion(mult = c(0, 0.16))) +
+  labs(title = "Rain intensity shifts within each month",
+       subtitle = "Median rain on days with more than 1 mm rain, Bangalore, complete years 1981–2025",
+       caption = "Daily ERA5 archive; full-month comparison and half-month windows are shown separately") +
+  theme_weather() +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1, size = 8.5),
+        strip.text = element_text(face = "bold", color = "#3C3C3C"))
+p
+ggsave(chart_path, p, width = 13, height = 5.8, dpi = 180, bg = "white")
+```
+
+## Checks and interpretation
+
+The rainy-day filter changes the question from “how much rain does the period produce?” to “when it rains, how large is a typical rainy day?” Rain frequency is therefore shown alongside the intensity result so the two are not conflated.
+
+Looking at all half-months shows that September's late increase is not unique. The second half of May is the highest half-month at `r round(summary_tbl$median_rain_mm[summary_tbl$period == "May 16–31"], 2)` mm. September's second half is next at `r round(summary_tbl$median_rain_mm[summary_tbl$period == "September 16–30"], 2)` mm, while June is the only month whose second half is less intense than its first half (`r round(summary_tbl$median_rain_mm[summary_tbl$period == "June 1–15"], 2)` versus `r round(summary_tbl$median_rain_mm[summary_tbl$period == "June 16–30"], 2)` mm).
+
+## Verdict
+
+Insightful: yes
+
+September rainy days are somewhat wetter than July and August by the median measure (5.00 mm versus 4.20 and 4.39 mm), but the gap is modest. The all-half-month view adds a useful wrinkle: rain intensity rises sharply in the second half of May and September, while June weakens in its second half. That within-month structure is more interesting than the original full-month ranking, and is enough to clear the publication bar as a compact seasonal observation.
+
+This is a descriptive pattern, not a causal explanation. The conditional median describes the typical rainy day; it does not measure total rainfall or rainfall frequency.
+
+Charts:
+
+- `docs/assets/analysis/september-rain-intensity.png`
+
+Blog post:
+
+- `docs/blog/september-rain-intensity.html`
