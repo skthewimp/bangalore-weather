@@ -50,8 +50,15 @@ publish only the named completed analysis:
    `docs/blog/feed.xml`.
 4. Run `Rscript analysis_questions/update_site_analyses.R`.
 5. Verify the generated files.
-6. Commit the relevant changes and push.
-7. Report the published URL and commit hash back to Hermes.
+6. Follow `publishing/README.md` to export the approved article, inspect its Markdown
+   and rendered preview, and publish it to Substack through the pinned sandboxed runner.
+   Subscriber email requires an explicit request. For an existing live post, use the
+   documented audit/update flow instead of republishing it.
+7. Commit the relevant website changes and push. The runtime, credentials, draft IDs
+   and private backups are gitignored.
+8. Report the website URL, Substack URL and commit hash back to Hermes. If Substack
+   authentication or publishing fails, complete the website work and report Substack
+   as pending; do not claim that it succeeded.
 
 ## Process
 

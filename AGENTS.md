@@ -40,3 +40,14 @@ publish only the named analysis after confirming the notebook verdict is
 `Insightful: yes`, then commit and push.
 
 Only skip this workflow when the user explicitly asks for a quick inline answer.
+
+## Substack publishing
+
+For Hermes-approved weather publishing, follow `publishing/README.md` after finalizing
+and verifying the website article. Use only `python3 publishing/substack.py` with the
+pinned hardened fork. Inspect the exported Markdown and preview before publishing.
+Substack publishing is web-only unless the user explicitly requested subscriber email.
+Existing live posts require the documented audit/update flow and reviewed revision.
+Do not create remote Substack drafts in Hermes question/draft mode. Never ask for a
+session cookie in chat; the user runs terminal setup. Complete authorized website
+publishing if Substack is unavailable and report the Substack result separately.

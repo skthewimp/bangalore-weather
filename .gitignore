@@ -23,3 +23,7 @@ bangalore_winter_analysis.*
 # dated daily snapshots (YYYYMMDD).
 charts/bangalore_weather_????????.png
 docs/archive/bangalore_weather_????????.png
+
+# Pinned publishing runtime, credentials, drafts and private backups.
+.substack-runtime/
+.substack-state/
