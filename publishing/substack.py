@@ -212,8 +212,61 @@ def post_id(work):
     return match[1] if match else None
 
 
+def subtitle_for(slug):
+    path = ROOT / 'publishing/post-metadata.json'
+    entries = json.loads(path.read_text()) if path.exists() else {}
+    value = entries.get(slug, {}).get('subtitle')
+    if not isinstance(value, str) or not value.strip():
+        fail('Write and review a subtitle in publishing/post-metadata.json using publishing/subtitle-style.md')
+    if len(value.splitlines()) != 1 or any(ord(c) < 32 for c in value):
+        fail('Subtitle must be a single line without control characters')
+    return value.strip()
+
+
+def article_parts(work):
+    text = (work / 'post.md').read_text()
+    match = re.fullmatch(r'---\n(.*?)\n---\n([\s\S]*)', text, re.DOTALL)
+    if not match:
+        fail('Exported post needs valid frontmatter')
+    return match[1].splitlines(), match[2]
+
+
+def require_subtitle(slug, work):
+    lines, _ = article_parts(work)
+    values = [line[len('subtitle:'):].strip() for line in lines if line.startswith('subtitle:')]
+    if values != [subtitle_for(slug)]:
+        fail('Exported subtitle is missing or stale. Export again or use subtitle for an existing draft')
+
+
+def sync_subtitle(slug, work):
+    subtitle = subtitle_for(slug)
+    identifier = post_id(work)
+    if not identifier:
+        fail('Create a draft first')
+    before = remote(work, identifier)
+    if before.get('slug') != slug or before.get('is_published'):
+        fail('Subtitle command requires a matching unpublished draft')
+    lines, body = article_parts(work)
+    path = work / 'post.md'
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    private_json(STATE / 'backups' / slug / (digest + '-local.json'),
+                 {'markdown': path.read_text()})
+    lines = [line for line in lines if not line.startswith('subtitle:')]
+    lines.append('subtitle: ' + subtitle)
+    path.write_text('---\n' + '\n'.join(lines) + '\n---\n' + body)
+    mutate(work, ['set', identifier, '--subtitle', subtitle])
+    after = remote(work, identifier)
+    if after.get('draft_subtitle') != subtitle:
+        fail('Remote subtitle verification failed; inspect the draft')
+    for key in ('draft_body', 'draft_title', 'slug', 'is_published'):
+        if after.get(key) != before.get(key):
+            fail('Other draft content changed during the subtitle update; inspect before continuing')
+    print('Verified draft subtitle:', subtitle)
+
+
 def export(slug, work):
     check_verdict(slug)
+    subtitle = subtitle_for(slug)
     source = inside(ROOT / 'docs/blog' / (slug + '.html'), ROOT / 'docs/blog')
     identifier = post_id(work)
     parser = Article(source, work)
@@ -229,7 +282,7 @@ def export(slug, work):
     # Upstream frontmatter is a small parser; JSON quoting is not interpreted as YAML.
     if '\n' in title or '\r' in title:
         fail('Title must be a single line')
-    header = f'---\ntitle: {title}\nslug: {slug}\n'
+    header = f'---\ntitle: {title}\nsubtitle: {subtitle}\nslug: {slug}\n'
     if identifier:
         header += f'id: {identifier}\n'
     target = work / 'post.md'
@@ -260,7 +313,7 @@ def mutate(work, command):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['install', 'setup', 'doctor', 'export', 'render',
-                                         'draft', 'publish', 'audit', 'update', 'reconcile'])
+                                         'draft', 'publish', 'audit', 'update', 'reconcile', 'subtitle'])
     parser.add_argument('slug', nargs='?')
     parser.add_argument('--accept-live-sha256')
     parser.add_argument('--send-email', action='store_true')
@@ -308,6 +361,10 @@ def main():
             print('Linked existing post; inspect its content before publishing or updating')
             return
         check_verdict(args.slug)
+        if args.action == 'subtitle':
+            return sync_subtitle(args.slug, work)
+        if args.action in ('draft', 'publish', 'update'):
+            require_subtitle(args.slug, work)
         if args.action in ('audit', 'update'):
             identifier = post_id(work)
             if not identifier:

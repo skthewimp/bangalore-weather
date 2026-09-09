@@ -39,7 +39,11 @@ python3 publishing/substack.py doctor
 `/weather_question` remains notebook/verdict/gist only. Do not create a remote draft
 or publish a Substack post during that workflow.
 
-For `/weather_publish <slug>`, finish and verify the approved website article, then:
+For `/weather_publish <slug>`, finish and verify the approved website article. Follow
+[subtitle-style.md](subtitle-style.md) to write a subtitle that adds to the title, and
+save the selected line under the slug in `publishing/post-metadata.json`. Every Substack
+post needs a reviewed subtitle; export and writes check that it is present and current.
+Then:
 
 ```bash
 python3 publishing/substack.py export <slug>
@@ -65,6 +69,15 @@ IDs are saved in the local Markdown. Existing live posts refuse a second publish
 Report the website and Substack URLs separately. If authentication or Substack fails,
 finish the authorized website work and report that the Substack step remains pending;
 do not claim both destinations succeeded.
+
+To add or revise a subtitle on an existing draft, edit `post-metadata.json`, then run:
+
+```bash
+python3 publishing/substack.py subtitle <slug>
+```
+
+This updates and verifies draft metadata while preserving the body and publication
+status. The stored subtitle is retained on subsequent exports.
 
 ## Updating an existing post
 

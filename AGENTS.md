@@ -45,7 +45,9 @@ Only skip this workflow when the user explicitly asks for a quick inline answer.
 
 For Hermes-approved weather publishing, follow `publishing/README.md` after finalizing
 and verifying the website article. Use only `python3 publishing/substack.py` with the
-pinned hardened fork. Inspect the exported Markdown and preview before publishing.
+pinned hardened fork. For every Substack post, follow `publishing/subtitle-style.md`
+and save a reviewed subtitle in `publishing/post-metadata.json` before export. Inspect
+the title/subtitle pair, exported Markdown and preview before publishing.
 Substack publishing is web-only unless the user explicitly requested subscriber email.
 Existing live posts require the documented audit/update flow and reviewed revision.
 Do not create remote Substack drafts in Hermes question/draft mode. Never ask for a
