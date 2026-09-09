@@ -80,7 +80,11 @@ def credentials():
     if config.get('publication_url') != SPEC['publication_url']:
         fail('Credential destination does not match the approved publication')
     # Reject stale cached identities and optional templates from another publication.
+    cookie_name = config.get('session_cookie_name', 'connect.sid')
+    if cookie_name not in ('connect.sid', 'substack.sid'):
+        fail('Session cookie name must be connect.sid or substack.sid')
     config = {key: config[key] for key in ('publication_url', 'session_token')}
+    config['session_cookie_name'] = cookie_name
     if not isinstance(config['session_token'], str) or not 1 <= len(config['session_token']) <= 4096:
         fail('Session cookie is missing or too large')
     return config
@@ -260,6 +264,8 @@ def main():
     parser.add_argument('slug', nargs='?')
     parser.add_argument('--accept-live-sha256')
     parser.add_argument('--send-email', action='store_true')
+    parser.add_argument('--cookie-name', choices=['connect.sid', 'substack.sid'],
+                        default='connect.sid', help='cookie name shown in your browser (setup only)')
     parser.add_argument('--id', type=int, help='existing remote post ID for reconciliation')
     args = parser.parse_args()
     STATE.mkdir(exist_ok=True, mode=0o700)
@@ -271,11 +277,12 @@ def main():
         if args.action == 'setup':
             if not sys.stdin.isatty():
                 fail('Run setup yourself in an interactive terminal; never send a cookie in chat')
-            token = getpass.getpass('Substack connect.sid (hidden): ').strip()
+            token = getpass.getpass(f'Substack {args.cookie_name} (hidden): ').strip()
             if not 1 <= len(token) <= 4096 or any(c in token for c in '\r\n;'):
                 fail('Invalid session cookie')
             private_json(STATE / 'credentials.json',
-                         {'publication_url': SPEC['publication_url'], 'session_token': token})
+                         {'publication_url': SPEC['publication_url'], 'session_token': token,
+                          'session_cookie_name': args.cookie_name})
             sandbox(STATE / 'doctor', ['doctor'], authenticated=True)
             return
         if args.action == 'doctor':

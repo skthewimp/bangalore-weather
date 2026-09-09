@@ -19,7 +19,14 @@ python3 publishing/substack.py setup
 
 Run setup yourself in an interactive terminal. While logged in as the publication's
 author, open browser developer tools, select Application/Storage > Cookies > the
-publication domain, and copy `connect.sid`. Paste it at the hidden terminal prompt,
+publication domain, and find `connect.sid` or `substack.sid`. Use the name that is
+actually present. For `substack.sid`, run:
+
+```bash
+python3 publishing/substack.py setup --cookie-name substack.sid
+```
+
+Copy that cookie's value exactly as shown. Paste it at the hidden terminal prompt,
 never in Hermes/chat. Setup stores an owner-only, gitignored credential file and checks
 it with `doctor`. Repeat setup when the session expires.
 

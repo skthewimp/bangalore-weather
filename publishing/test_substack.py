@@ -99,3 +99,21 @@ def test_actual_authenticated_sandbox_receives_only_selected_credential(tmp_path
     monkeypatch.setattr(runner, 'execute', execute)
     result = runner.sandbox(tmp_path / 'post', ['doctor'], authenticated=True, capture=True)
     assert result.stdout.strip() == 'credential-isolated'
+
+
+@pytest.mark.parametrize('name', ['connect.sid', 'substack.sid'])
+def test_credentials_preserve_the_selected_cookie_name(tmp_path, monkeypatch, name):
+    monkeypatch.setattr(runner, 'STATE', tmp_path)
+    runner.private_json(tmp_path / 'credentials.json', {
+        'publication_url': runner.SPEC['publication_url'], 'session_token': 'fake',
+        'session_cookie_name': name})
+    assert runner.credentials()['session_cookie_name'] == name
+
+
+def test_credentials_reject_unrecognized_cookie_name(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, 'STATE', tmp_path)
+    runner.private_json(tmp_path / 'credentials.json', {
+        'publication_url': runner.SPEC['publication_url'], 'session_token': 'fake',
+        'session_cookie_name': 'anything-else'})
+    with pytest.raises(RuntimeError, match='cookie name'):
+        runner.credentials()
