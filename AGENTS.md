@@ -47,9 +47,12 @@ For Hermes-approved weather publishing, follow `publishing/README.md` after fina
 and verifying the website article. Use only `python3 publishing/substack.py` with the
 pinned hardened fork. For every Substack post, follow `publishing/subtitle-style.md`
 and save a reviewed subtitle in `publishing/post-metadata.json` before export. Inspect
-the title/subtitle pair, exported Markdown and preview before publishing.
-Substack publishing is web-only unless the user explicitly requested subscriber email.
-Existing live posts require the documented audit/update flow and reviewed revision.
+the title/subtitle pair, exported Markdown and preview before creating the draft.
+Substack is draft-only until the user explicitly changes the automation policy.
+Even `/weather_publish` publishes only the website and creates or updates a Substack
+draft. Return its editor URL for manual review and publication. Do not publish,
+schedule, email subscribers, or update live Substack posts. Do not bypass the runner's
+draft-only guard or change its mode as part of an ordinary article request.
 Do not create remote Substack drafts in Hermes question/draft mode. Never ask for a
 session cookie in chat; the user runs terminal setup. Complete authorized website
 publishing if Substack is unavailable and report the Substack result separately.

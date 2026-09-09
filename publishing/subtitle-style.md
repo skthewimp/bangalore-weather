@@ -65,9 +65,9 @@ Examples, quoted from the author's own subtitles:
 Each entry in `post-metadata.json` contains a `subtitle` string. Keep it on one line.
 This file is the durable editorial source; the local Substack Markdown is an export.
 Export includes the subtitle in frontmatter and refuses missing or blank entries.
-Draft/publish/update also refuse an exported subtitle that differs from the stored line.
+Draft submissions also refuse an exported subtitle that differs from the stored line.
 
 For an existing draft, `python3 publishing/substack.py subtitle <slug>` applies the
 stored line, preserves the article body, and verifies the remote result. For a live
-post, use the existing reviewed export/audit/update workflow instead. The subtitle
-command deliberately handles drafts only.
+post, make changes manually in Substack while the draft-only policy is active. The
+subtitle command deliberately handles drafts only.

@@ -4,7 +4,11 @@ The runtime is pinned in `substack-runtime.json` to our hardened fork:
 https://github.com/skthewimp/substack-cli
 
 The publication is https://bangaloreweather.substack.com. The website remains the
-article source. This integration does not publish anything during installation.
+article source. **Substack is draft-only for now**, including Hermes-triggered runs.
+The runner blocks live publication, scheduling, subscriber emails and live-post updates.
+The user reviews and publishes drafts manually in Substack. An ordinary article request
+must not change this policy; enabling automation later requires an explicit instruction
+and a reviewed change to the runner. Website publishing keeps its existing approval flow.
 
 ## Local setup
 
@@ -48,7 +52,7 @@ Then:
 ```bash
 python3 publishing/substack.py export <slug>
 # Inspect .substack-state/posts/<slug>/post.md and preview.json.
-python3 publishing/substack.py publish <slug>
+python3 publishing/substack.py draft <slug>
 ```
 
 Export requires a literal `Insightful: yes` under the notebook's Verdict. If a notebook
@@ -58,17 +62,11 @@ and the Original question section. The export copies only local docs/assets imag
 It preserves article text, links, captions and the original question through Pandoc.
 Substack controls the resulting typography and layout.
 
-Publish is web-only. Add `--send-email` only when subscriber delivery was explicitly
-requested. To stage a remote draft for an approved article without publishing it:
-
-```bash
-python3 publishing/substack.py draft <slug>
-```
-
-IDs are saved in the local Markdown. Existing live posts refuse a second publish.
-Report the website and Substack URLs separately. If authentication or Substack fails,
-finish the authorized website work and report that the Substack step remains pending;
-do not claim both destinations succeeded.
+Draft IDs are saved in the local Markdown, so another draft run updates the same
+unpublished post. Existing live posts are refused. Return the draft editor URL for
+manual review and publication; do not invoke publishing or scheduling through another
+tool. Report the published website URL and the Substack draft URL separately. If
+Substack fails, finish the authorized website work and report the draft as pending.
 
 To add or revise a subtitle on an existing draft, edit `post-metadata.json`, then run:
 
@@ -81,24 +79,12 @@ status. The stored subtitle is retained on subsequent exports.
 
 ## Updating an existing post
 
-```bash
-python3 publishing/substack.py export <slug>
-python3 publishing/substack.py audit <slug>
-```
+For an unpublished draft, edit the approved website source or subtitle metadata,
+export and inspect it, then run `draft` again. Keep its saved ID.
 
-Inspect the current live article, exported Markdown, removed text/image references,
-and the revision fingerprint in the audit. An audit with differences exits nonzero;
-that is a review requirement, not a reason to bypass it. Within the user's approved
-edit scope, use the reviewed live fingerprint for an intentional replacement:
-
-```bash
-python3 publishing/substack.py update <slug> --accept-live-sha256 <reviewed-live-sha256>
-```
-
-Never mechanically forward the audit fingerprint. The CLI independently audits,
-backs up the live record, and rechecks the revision before writing. Local Markdown
-versions and remote JSON backups live in `.substack-state/backups/`. Retain this
-private state: it includes draft IDs and recovery material. Git does not back it up.
+Live Substack edits are disabled. You may read or audit a live post, but edits and
+publication must be done manually in Substack for now. The fork's backup/revision
+safeguards are retained for a future explicitly approved automation change.
 
 An interrupted/failed write leaves `pending.json` and blocks another write. Inspect
 the remote publication before retrying. If the post exists, reconnect it explicitly:

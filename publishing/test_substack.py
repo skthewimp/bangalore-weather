@@ -53,8 +53,8 @@ def test_failed_write_retains_marker(tmp_path, monkeypatch):
         raise subprocess.CalledProcessError(1, 'simulated write')
     monkeypatch.setattr(runner, 'sandbox', failure)
     with pytest.raises(subprocess.CalledProcessError):
-        runner.mutate(tmp_path, ['publish', '123', '--yes'])
-    assert json.loads((tmp_path / 'pending.json').read_text())['command'][0] == 'publish'
+        runner.mutate(tmp_path, ['push', 'post.md'])
+    assert json.loads((tmp_path / 'pending.json').read_text())['command'][0] == 'push'
 
 
 def test_export_rejects_asset_traversal(tmp_path, monkeypatch):

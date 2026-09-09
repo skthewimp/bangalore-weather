@@ -90,7 +90,19 @@ def credentials():
     return config
 
 
+def check_draft_mode(command):
+    mode = SPEC.get('mode', 'draft-only')
+    if mode != 'draft-only':
+        fail('Unrecognized publishing mode; changing automation policy requires a reviewed code change')
+    allowed = {'doctor', 'list', 'get', 'templates', 'render', 'audit', 'push', 'set', '--help', '--version'}
+    if not command or command[0] not in allowed:
+        fail('Substack is draft-only. Publish manually in Substack after reviewing the draft')
+    if command[0] == 'set' and (len(command) != 4 or command[2] != '--subtitle'):
+        fail('Draft-only metadata edits are limited to the reviewed subtitle command')
+
+
 def sandbox(work, command, authenticated=False, capture=False):
+    check_draft_mode(command)
     verify_runtime()
     if not shutil.which('bwrap'):
         fail('bubblewrap is required; there is no unsandboxed fallback')
@@ -301,6 +313,7 @@ def remote(work, identifier):
 
 
 def mutate(work, command):
+    check_draft_mode(command)
     pending = work / 'pending.json'
     if pending.exists():
         fail('An earlier write is unresolved; inspect Substack and run reconcile before another write')
@@ -321,6 +334,8 @@ def main():
                         default='connect.sid', help='cookie name shown in your browser (setup only)')
     parser.add_argument('--id', type=int, help='existing remote post ID for reconciliation')
     args = parser.parse_args()
+    if args.action in ('publish', 'update') or args.send_email:
+        fail('Substack is draft-only. Use draft, then review and publish manually in Substack')
     STATE.mkdir(exist_ok=True, mode=0o700)
     # Serialize all runner actions to protect local IDs and in-flight write markers.
     with (STATE / 'runner.lock').open('a') as lock:
@@ -387,9 +402,10 @@ def main():
             if record.get('slug') != args.slug:
                 fail('Linked post does not match the approved slug')
             if record.get('is_published'):
-                fail('This post is already live. Use audit and update after reviewing the changes')
+                fail('This post is already live. Automated live edits are disabled in draft-only mode')
         sandbox(work, ['render', 'post.md', '-o', 'preview.json'])
         mutate(work, ['push', 'post.md'])
+        print(SPEC['publication_url'] + '/publish/post/' + post_id(work))
         if args.action == 'publish':
             identifier = post_id(work)
             if not identifier:
