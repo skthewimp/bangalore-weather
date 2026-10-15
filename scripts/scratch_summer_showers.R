@@ -1,8 +1,23 @@
+# Resolve shared inputs relative to this script, independent of the working directory.
+script_path <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+if (is.null(script_path)) {
+  script_arg <- grep("^--file=", commandArgs(), value = TRUE)
+  script_path <- if (length(script_arg)) sub("^--file=", "", script_arg[[1]]) else NULL
+}
+if (is.null(script_path) && requireNamespace("rstudioapi", quietly = TRUE) && rstudioapi::isAvailable()) {
+  script_path <- rstudioapi::getSourceEditorContext()$path
+}
+if (!is.null(script_path) && nzchar(script_path)) {
+  project_root <- normalizePath(file.path(dirname(script_path), ".."))
+} else {
+  project_root <- normalizePath(if (dir.exists("data")) "." else "..")
+}
+
 library(tidyverse)
 library(lubridate)
 
-load("data/bangaloreTemperature.RData")
-load("data/bangaloreRainfall.RData")
+load(file.path(project_root, "data", "bangaloreTemperature.RData"))
+load(file.path(project_root, "data", "bangaloreRainfall.RData"))
 
 # Join hourly temp + rain
 blrRain <- blrRain %>% mutate(Rain = as.numeric(Rain)) %>%
@@ -169,4 +184,4 @@ freq <- baseline %>% group_by(bin) %>% summarise(
 print(freq)
 
 saveRDS(list(events=summary_ev, baseline=baseline, hm=hm, net=net, freq=freq),
-        "scratch_summer_showers_results.rds")
+        file.path(project_root, "scratch_summer_showers_results.rds"))

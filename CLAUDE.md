@@ -9,11 +9,11 @@
 ## Terminal Execution Guidelines (Important!)
 *   **Non-Interactive Execution**: When executing terminal commands automatically, the system crashes if it encounters an interactive pager or prompt (throwing `unexpected user interaction type: not permission`).
 *   **Git**: Always bypass pagers. Use `git --no-pager status`, `git --no-pager diff`, and `git --no-pager log`.
-*   **File Deletion**: The system profile aliases `rm` to `rm -i`. When deleting files via command line, always use `\rm` to force a non-interactive execution. 
+*   **File Deletion**: The system profile aliases `rm` to `rm -i`. When deleting files via command line, always use `\rm` to force a non-interactive execution.
 *   **Commits**: Use `caveman-commit` skill conventions for commit formatting.
 
 ## Project Structure
-*   **Historical Wind Scripts**: `fetch_historical_wind.R` and `fetch_historical_wind_direction.R` are one-off scripts used to pull 45-year chunks (1981-present). 
+*   **Historical Wind Scripts**: `scripts/fetch_historical_wind.R` and `scripts/fetch_historical_wind_direction.R` are one-off scripts used to pull 45-year chunks (1981-present).
 *   **Updates**: Both `wind_speed` and `wind_direction` have now been integrated into `bangalore_weather_update.R` and `bangaloreWind.RData`.
 
 ## Weather Question Workflow

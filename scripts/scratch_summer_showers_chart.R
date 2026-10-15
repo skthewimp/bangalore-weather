@@ -1,8 +1,23 @@
+# Resolve shared inputs relative to this script, independent of the working directory.
+script_path <- tryCatch(sys.frame(1)$ofile, error = function(e) NULL)
+if (is.null(script_path)) {
+  script_arg <- grep("^--file=", commandArgs(), value = TRUE)
+  script_path <- if (length(script_arg)) sub("^--file=", "", script_arg[[1]]) else NULL
+}
+if (is.null(script_path) && requireNamespace("rstudioapi", quietly = TRUE) && rstudioapi::isAvailable()) {
+  script_path <- rstudioapi::getSourceEditorContext()$path
+}
+if (!is.null(script_path) && nzchar(script_path)) {
+  project_root <- normalizePath(file.path(dirname(script_path), ".."))
+} else {
+  project_root <- normalizePath(if (dir.exists("data")) "." else "..")
+}
+
 library(tidyverse)
 library(lubridate)
 library(scales)
 
-res <- readRDS("scratch_summer_showers_results.rds")
+res <- readRDS(file.path(project_root, "scratch_summer_showers_results.rds"))
 baseline <- res$baseline
 
 bin_levels <- c("Apr 1-15", "Apr 16-30", "May 1-15", "May 16-31")
@@ -45,7 +60,7 @@ p1 <- ggplot(plot_df, aes(moment, temp, group = type, color = type)) +
     plot.title = element_text(face = "bold")
   )
 
-ggsave("charts/summer_showers_cooling.png", p1, width = 11, height = 5.5, dpi = 150, bg = "white")
+ggsave(file.path(project_root, "charts", "summer_showers_cooling.png"), p1, width = 11, height = 5.5, dpi = 150, bg = "white")
 
 # Frequency chart
 freq <- res$freq %>% mutate(bin = factor(bin, levels = bin_levels))
@@ -63,6 +78,6 @@ p2 <- ggplot(freq, aes(bin, pct)) +
   theme(panel.grid.minor = element_blank(),
         plot.title = element_text(face = "bold"))
 
-ggsave("charts/summer_showers_frequency.png", p2, width = 9, height = 5, dpi = 150, bg = "white")
+ggsave(file.path(project_root, "charts", "summer_showers_frequency.png"), p2, width = 9, height = 5, dpi = 150, bg = "white")
 
 cat("Charts saved.\n")

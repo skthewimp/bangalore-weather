@@ -4,6 +4,15 @@ Temperature and rainfall visualizations for Bangalore (Bengaluru), using hourly 
 
 ## What's here
 
+- `analysis/`: older exploratory notebooks and the reference fact-check workbook.
+- `analysis_questions/`: question-driven analyses, notebooks, and rendered results.
+- `scripts/`: one-off historical imports, summer-shower probes, and the legacy commit helper. For example, run `Rscript scripts/scratch_summer_showers.R`; the scripts resolve shared data relative to the repository.
+- `notes/`: development history, writing/visualization guides, and blog drafts.
+- `data/` and `charts/`: shared data and generated charts.
+- `docs/`: the live website; its URLs and deployment path stay unchanged.
+
+The daily launcher and shared chart code remain at the repository root so scheduled jobs and existing analysis imports keep working. Render notebooks in `analysis/` with `rmarkdown::render("analysis/<name>.Rmd")`; they resolve data from the repository root.
+
 **`bangalore_weather_update.R`** -Downloads the latest hourly temperature and precipitation data from Oikolab, appends it to the local `.RData` files, and produces a chart for the current year. Includes a 3-bullet AI commentary summarising the last 2 weeks of weather compared to historical norms. Skips the API fetch gracefully if data is already up to date.
 
 **`bangalore_weather_historical.R`** -Generates year-by-year weather charts for any past year. Each chart includes:

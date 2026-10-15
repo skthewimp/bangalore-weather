@@ -3,11 +3,14 @@ title: "Weather notebook"
 ---
 
 ```{r}
+project_root <- normalizePath(if (dir.exists("data")) "." else "..")
+knitr::opts_knit$set(root.dir = project_root)
+
 library(tidyverse)
 library(lubridate)
-load('~/Documents/work/data work/bangalore/weather/data/bangaloreRainfall.RData')
-load('~/Documents/work/data work/bangalore/weather/data/bangaloreTemperature.RData')
-load('~/Documents/work/data work/bangalore/weather/data/bangaloreWind.RData')
+load(file.path(project_root, 'data', 'bangaloreRainfall.RData'))
+load(file.path(project_root, 'data', 'bangaloreTemperature.RData'))
+load(file.path(project_root, 'data', 'bangaloreWind.RData'))
 ```
 
 ```{r}

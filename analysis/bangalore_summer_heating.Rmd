@@ -5,13 +5,16 @@ output: html_notebook
 ---
 
 ```{r setup, message=FALSE, warning=FALSE}
+project_root <- normalizePath(if (dir.exists("data")) "." else "..")
+knitr::opts_knit$set(root.dir = project_root)
+
 require(tidyverse)
 require(lubridate)
 require(ggthemes)
 require(ggrepel)
 require(patchwork)
 
-load('/Users/Karthik/Documents/work/data work/bangalore/weather/data/bangaloreTemperature.RData')
+load(file.path(project_root, 'data', 'bangaloreTemperature.RData'))
 
 blrTemp %>%
   filter(!is.na(Temp)) %>%
