@@ -1,12 +1,12 @@
 {
   "title": "Bangalore's Weather in 2026",
-  "as_of": "2026-07-02",
-  "generated_on": "2026-07-03",
-  "chart_date_text": "as of July 02",
+  "as_of": "2026-10-14",
+  "generated_on": "2026-10-15",
+  "chart_date_text": "as of October 14",
   "recent_window_days": 14,
-  "insights": ["Last 14 days brought 38% less rain than normal despite 12 rainy days", "Warm nights stuck around, averaging 0.6°C above normal throughout the spell", "Jun 27-28 saw highs spike 2.7°C above normal on back-to-back days"],
-  "image": "assets/latest.png",
-  "archive_image": "archive/bangalore_weather_20260703.png",
+  "insights": ["Oct 05-06 dumped 28mm in two days, nearly 90% of the last 14 days's rain", "Last 14 days had 57% less rain than normal despite frequent rainy days", "Highs running 2-3°C above normal through Oct 14, with record heat on Oct 10, 13-14"],
+  "image": "assets/latest.png?revision=e871fab76f313eea32abf0deac012665",
+  "archive_image": "archive/bangalore_weather_20261015.png",
   "source": "Oikolab",
   "repository": "https://github.com/skthewimp/bangalore-weather"
 }

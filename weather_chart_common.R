@@ -117,8 +117,8 @@ build_temperature_plot_data <- function(blrTemp, curr_year) {
         .default = NA_character_
       ),
       Special = case_when(
-        ActualHigh >= RecordHigh ~ paste("Hottest", format(Date, "%b %d"), "since 1981"),
-        ActualLow <= RecordLow ~ paste("Coldest", format(Date, "%b %d"), "since 1981"),
+        ActualHigh >= RecordHigh ~ paste("Record high", format(Date, "%b %d")),
+        ActualLow <= RecordLow ~ paste("Record low", format(Date, "%b %d")),
         .default = ""
       ),
       xmin = Date - 0.48,
@@ -194,7 +194,7 @@ build_rain_plot_data <- function(blrRain, curr_year) {
         Day == max(Day) ~ as.character(round(CumulRain, 0)),
         .default = ""
       ),
-      MonthLabel = ifelse(CumulRain == MonthlyMax & Day == 15, paste("Wettest", month.name[Month], "since 1981"), ""),
+      MonthLabel = ifelse(CumulRain == MonthlyMax & Day == 15, paste("Record rain", month.name[Month]), ""),
       DayLabel = ifelse(Day == PeakDay & Rain == DailyMax & Rain > 0, paste0("Record ", month.name[Month], " ", Day, "; ", round(Rain, 0), " mm"), ""),
       Label = case_when(
         DayLabel != "" ~ DayLabel,
