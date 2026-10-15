@@ -19,8 +19,12 @@ When available, use the weather/data-story skills in this order:
   publication-ready.
 - `karthik-writing-style` when drafting or polishing a public blog post.
 
-- Use ERA5 data only for weather analysis. Do not use GFS-backed data for
-  analysis posts because GFS rows can be overwritten and invalidate results.
+- Select the source using `analysis_questions/data_sources.md`: WeatherUnion for
+  local station observations and neighbourhood comparisons; Oikolab/ERA5 for
+  long-term history, records, and seasonal baselines. Check actual coverage first.
+  Keep the two sources distinct when a question needs both. Within Oikolab use
+  ERA5 only; do not use GFS-backed data for analysis posts because those rows can
+  be overwritten and invalidate results.
 - Create a notebook from `analysis_questions/question_template.Rmd`.
 - Store the exact user prompt in the notebook `trigger_prompt` field.
 - Run the analysis and write the notebook `Verdict`.

@@ -1,0 +1,231 @@
+---
+title: "How uneven was Bangalore's rain this monsoon?"
+question: "How did daily rainfall vary across Bangalore localities from May 1 through September 30, 2026?"
+trigger_prompt: >-
+  I want to do some analysis of how rain varies in different parts of Bangalore. Let us use this year's daily rainfall in different parts of Bangalore. Maybe we will go from May 1st until September 30th we have data in weather union for some 30 different localities in Bangalore. so yeah, just I don't know maybe you could just have a graph with all of them, maybe one panel with some 25 different lines showing how rainfall has varied. I don't know, you figure out the right chart form and then do some analysis on this. This will be for publishing on the cloud
+author: "Codex"
+date: "2026-10-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(arrow)
+library(lubridate)
+library(scales)
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## What are we trying to see?
+
+The first instinct is to draw one daily-rain line for every locality. That is useful as a raw view, but it becomes spaghetti quickly because most days are zero and the interesting comparison is really two things:
+
+1. **When did rain arrive, and where?** A date-by-locality heatmap is better for this than 28 overlapping lines.
+2. **How much accumulated over the season?** A ranked horizontal chart makes the seasonal differences directly comparable without the identification problem of 28 overlapping cumulative lines.
+
+The unit is a locality-day. Rain is the sum of WeatherUnion's derived hourly `rain_mm`, but only on days with 24 valid hourly rain values. This is station rainfall, not an interpolated ward or city-wide surface.
+
+## First, check coverage
+
+```{r coverage}
+archive <- open_dataset(file.path(root_dir, "data", "weatherunion_bengaluru_hourly.parquet"))
+
+hourly <- archive %>%
+  filter(
+    hour_ist >= as.POSIXct("2026-05-01 00:00:00", tz = "Asia/Kolkata"),
+    hour_ist < as.POSIXct("2026-10-01 00:00:00", tz = "Asia/Kolkata")
+  ) %>%
+  select(locality_id, current_locality_name, hour_ist, rain_mm) %>%
+  collect() %>%
+  mutate(date = as.Date(hour_ist, tz = "Asia/Kolkata"))
+
+stopifnot(!anyDuplicated(hourly[c("locality_id", "hour_ist")]))
+stopifnot(all(hourly$rain_mm >= 0 | is.na(hourly$rain_mm)))
+
+daily_raw <- hourly %>%
+  group_by(locality_id, current_locality_name, date) %>%
+  summarise(
+    observed_hours = n(),
+    valid_rain_hours = sum(!is.na(rain_mm)),
+    rain_mm = sum(rain_mm, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # Missing hourly rain is not silently treated as a complete day's total.
+    rain_mm = if_else(valid_rain_hours == 24, rain_mm, NA_real_)
+  )
+
+coverage <- daily_raw %>%
+  summarise(
+    days_in_window = n(),
+    complete_days = sum(!is.na(rain_mm)),
+    first_day = min(date),
+    last_day = max(date),
+    .by = c(locality_id, current_locality_name)
+  ) %>%
+  arrange(desc(complete_days), current_locality_name)
+
+coverage
+```
+
+There are 31 localities with at least some data in the requested window. To avoid letting short or late-starting sensors distort the comparison, I keep the 28 localities with at least 120 complete rain-days. Three localities are excluded from the main comparison because their coverage is too short or incomplete for a May–September seasonal total. The excluded localities are retained in the coverage table above rather than silently disappearing.
+
+## The daily pattern: rain was episodic and spatially patchy
+
+```{r heatmap}
+selected <- coverage %>%
+  filter(complete_days >= 120) %>%
+  pull(current_locality_name)
+
+row_totals <- daily_raw %>%
+  filter(current_locality_name %in% selected) %>%
+  group_by(current_locality_name) %>%
+  summarise(seasonal_rain_mm = sum(rain_mm, na.rm = TRUE), .groups = "drop")
+
+plot_daily <- daily_raw %>%
+  filter(current_locality_name %in% selected) %>%
+  left_join(row_totals, by = "current_locality_name") %>%
+  mutate(
+    # Alphabetical order makes the heatmap usable as a locality lookup table.
+    current_locality_name = factor(
+      current_locality_name,
+      levels = rev(sort(unique(as.character(current_locality_name))))
+    ),
+    rain_for_tile = replace_na(rain_mm, 0),
+    coverage = if_else(is.na(rain_mm), "Incomplete", "Complete")
+  )
+
+heat_path <- file.path(chart_dir, "bangalore-rain-variation-2026-daily-heatmap.png")
+heat <- ggplot() +
+  # Incomplete station-days get their own neutral tile, not an accidental zero.
+  geom_tile(
+    data = plot_daily %>% filter(coverage == "Incomplete"),
+    aes(date, current_locality_name),
+    fill = "#8C8C8C",
+    width = 1,
+    height = 0.9
+  ) +
+  geom_tile(
+    data = plot_daily %>% filter(coverage == "Complete"),
+    aes(date, current_locality_name, fill = rain_for_tile),
+    width = 1,
+    height = 0.9
+  ) +
+  geom_segment(
+    data = distinct(plot_daily, current_locality_name, seasonal_rain_mm),
+    aes(
+      x = as.Date("2026-10-01"),
+      xend = as.Date("2026-10-01") + 20 * seasonal_rain_mm / max(seasonal_rain_mm),
+      y = current_locality_name,
+      yend = current_locality_name
+    ),
+    linewidth = 4.5,
+    lineend = "butt",
+    colour = "#79AEB8"
+  ) +
+  geom_text(
+    data = distinct(plot_daily, current_locality_name, seasonal_rain_mm),
+    aes(
+      x = as.Date("2026-10-26"),
+      y = current_locality_name,
+      label = number(seasonal_rain_mm, accuracy = 10, suffix = " mm")
+    ),
+    hjust = 1,
+    size = 2.8,
+    colour = "#333333"
+  ) +
+  annotate(
+    "text",
+    x = as.Date("2026-10-01"),
+    y = Inf,
+    label = "May–Sep total",
+    hjust = 0,
+    vjust = -0.7,
+    size = 3.0,
+    fontface = "bold",
+    colour = "#333333"
+  ) +
+  scale_fill_gradient(
+    low = "#EAF3F5",
+    high = "#2B7A8B",
+    trans = "sqrt",
+    breaks = c(0, 1, 5, 20, 60, 100),
+    labels = label_number(suffix = " mm"),
+    name = "Rain on a complete day"
+  ) +
+  scale_x_date(
+    breaks = seq(as.Date("2026-05-01"), as.Date("2026-09-01"), by = "month"),
+    date_labels = "%b",
+    limits = c(as.Date("2026-05-01"), as.Date("2026-10-27")),
+    expand = expansion(mult = c(0, 0))
+  ) +
+  scale_y_discrete(limits = rev(sort(unique(as.character(plot_daily$current_locality_name))))) +
+  labs(
+    title = "Daily rainfall was highly uneven across 28 Bangalore stations",
+    subtitle = "May 1–September 30, 2026 · rows are alphabetical; totals at right use complete station-days",
+    x = NULL,
+    y = NULL,
+    caption = "Pale cells are complete dry days; dark cells are wetter days; grey cells are incomplete station-days. Right-hand bars share a linear scale, with the longest bar equal to the wettest selected station. WeatherUnion station observations, not an interpolated city-wide field."
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.y = element_text(size = 8, colour = "#333333"),
+    axis.text.x = element_text(colour = "#333333"),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(colour = "#666666"),
+    plot.caption = element_text(colour = "#666666", size = 8),
+    legend.position = "right"
+  )
+heat
+ggsave(heat_path, heat, width = 12, height = 9.5, dpi = 180, bg = "white")
+```
+
+The heatmap is the main chart because the daily values are mostly zero, with rainfall concentrated in a relatively small number of event days. It lets us see whether a wet day was broad-based or confined to a few parts of Bangalore without forcing the reader to trace dozens of overlapping lines.
+
+The row-end totals make the heatmap self-contained: locality order supports lookup, while the totals provide the seasonal comparison without a second chart.
+
+## What stands out?
+
+```{r facts}
+facts <- daily_raw %>%
+  filter(current_locality_name %in% selected, !is.na(rain_mm)) %>%
+  group_by(current_locality_name) %>%
+  summarise(
+    complete_days = n(),
+    seasonal_rain_mm = sum(rain_mm),
+    rainy_days = sum(rain_mm > 0),
+    largest_day_mm = max(rain_mm),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(seasonal_rain_mm))
+
+facts
+
+spread <- facts %>%
+  summarise(
+    wettest_total = max(seasonal_rain_mm),
+    driest_total = min(seasonal_rain_mm),
+    ratio = wettest_total / driest_total,
+    gap_mm = wettest_total - driest_total,
+    median_total = median(seasonal_rain_mm)
+  )
+spread
+```
+
+In this snapshot, MG Road is the wettest of the selected stations at about 702 mm, while Jalahalli is the driest at about 230 mm. That is a spread of roughly 472 mm, or just over three times from the driest selected station to the wettest. This is enough to make “Bangalore rainfall” a misleading shorthand for this period: the archive is showing station-level spatial variation, not one uniform city experience.
+
+## Verdict
+
+Insightful: yes
+
+The heatmap should be the single publishable chart: it carries event timing, spatial patchiness, and each station's May–September total in one view. This remains an observational WeatherUnion comparison, not an estimate of rainfall across every neighbourhood or a causal explanation of why one area was wetter.
+
+**Charts:**
+
+- `docs/assets/analysis/bangalore-rain-variation-2026-daily-heatmap.png`
+
+**Blog post:** not published. This is a draft analysis from the chat workflow; public cloud/site publishing requires explicit approval.

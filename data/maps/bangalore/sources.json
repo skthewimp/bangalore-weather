@@ -1,0 +1,39 @@
+{
+  "retrieved_at_utc": "2026-09-16T12:18:31.239845+00:00",
+  "crs": "EPSG:4326",
+  "road_query_bbox_wsen": [
+    77.44133386,
+    12.781772,
+    77.80715268,
+    13.25957036
+  ],
+  "roads": {
+    "endpoint": "https://overpass-api.de/api/interpreter",
+    "query_file": "roads.overpassql",
+    "osm_timestamp_utc": "2026-09-16T12:17:21Z",
+    "segments": 17221,
+    "license": "ODbL-1.0",
+    "attribution": "\u00a9 OpenStreetMap contributors",
+    "license_url": "https://www.openstreetmap.org/copyright",
+    "scope": "Major roads only; complete ways intersecting query box, not clipped; not a navigable full street network"
+  },
+  "boundary": {
+    "url": "https://raw.githubusercontent.com/datameet/Municipal_Spatial_Data/0c3a2e3dd2e87c514817378d6c73a9dd2ffb8f69/Bangalore/BBMP.geojson",
+    "source_commit": "0c3a2e3dd2e87c514817378d6c73a9dd2ffb8f69",
+    "features": 243,
+    "license": "CC-BY-SA-2.5-IN",
+    "attribution": "DataMeet, Spatial Data of Municipalities",
+    "source_page": "https://projects.datameet.org/Municipal_Spatial_Data/",
+    "scope": "BBMP 2022 delimitation (243 wards), scraped from KSRSAC by DataMeet; not current GBA administrative boundaries",
+    "license_source": "https://github.com/datameet/Municipal_Spatial_Data/blob/master/Bangalore/Readme.md"
+  },
+  "stations": {
+    "source": "weatherunion_bengaluru_hourly.parquet",
+    "coordinates": "Existing latitude/longitude metadata; not geocoded here; physical station precision and datum not independently verified. Interpreted as WGS84 for plotting."
+  },
+  "sha256": {
+    "weatherunion_stations.geojson": "f8e2c4d2ebc637946b889f3e1997ddb6dd38ab308c42097e430a60515e044595",
+    "osm_major_roads.geojson": "21361f6baefe41b5ba47847345a858623aa1d94b3790e402aea2baeac813996d",
+    "bbmp_legacy_wards_source.geojson": "4a1186d15da9396c259a2c01b135ee5e903948d45de6e91c49e0ddd72f359a7b"
+  }
+}

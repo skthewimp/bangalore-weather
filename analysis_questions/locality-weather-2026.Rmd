@@ -1,0 +1,486 @@
+---
+title: "Locality weather charts for 2026"
+question: "Can the daily weather chart use WeatherUnion for Banashankari, Indiranagar and Bellandur, with Oikolab through February and WeatherUnion from March 1?"
+trigger_prompt: >-
+  Look at the daily weather charts that we are making right now using the Oikolab data. Now using the weather union data we should be able to generate these charts for every locality of Bangalore. The idea here is that like we use the whether union data where available and I think we have it from sometime this February onwards and where it is not available we just substitute it with the oikOLAB data let's not use the most like let's not substitute with the EICOLab data for recent times, like if let's say the weather union data is not there for the last 2-3 days or the week or something, for that we don't substitute, but for historical data, we just use the oikOLAB data and then like we can make these charts. Can you maybe pick three areas of Bangalore, Jaiyanagar, Indiranagar, Bellandur and produce this chart for this year? I mean it might be interesting to see.
+slug: "locality-weather-2026"
+date: "2026-09-17"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+params:
+  chart_year: 2026
+  as_of: "2026-09-17"
+  recent_days: 7
+  local_start: "2026-03-01"
+  localities: [Banashankari, Indiranagar, Bellandur]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 15,
+  fig.height = 8,
+  dpi = 160
+)
+library(tidyverse)
+library(lubridate)
+library(arrow)
+library(patchwork)
+root_dir <- normalizePath("..")
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+source(file.path(root_dir, "weather_chart_common.R"))
+chart_year <- params$chart_year
+as_of <- as.Date(params$as_of)
+recent_start <- as_of - params$recent_days
+local_start <- as.Date(params$local_start)
+first_day <- make_date(chart_year, 1, 1)
+last_day <- make_date(chart_year, 12, 31)
+last_complete_day <- min(as_of - 1, last_day)
+```
+
+## Question and definitions
+
+Recreate the existing annual temperature-range and within-month accumulated-rain
+chart for the three requested localities. Final locality selection: “ok use 1.
+Banashankari; 2. Indiranagar; 3. Bellandur”. This is a chart prototype, not a test of
+whether any locality has broken a historical record.
+
+- Unit: station-day, midnight to midnight IST. Expected denominator: 24 distinct
+  hours for each metric. Temperature is the minimum and maximum of hourly means;
+  rainfall is the sum of derived hourly increments, never the daily counter.
+- Require 24 valid hours for the WeatherUnion daily values. For the historical
+  Oikolab portion, follow the existing daily chart: use available temperature
+  extrema and sum available rainfall, with absent rainfall contributing zero.
+  Latest clarification: “no don't keep it blank. how do we do it normally inour daily chart? use the same. if incomplete assume 0.”
+- Source switch: following the latest user clarification, use Oikolab
+  **ERA5-only** city days before `r local_start`, and WeatherUnion only from that
+  date onward. Earlier WeatherUnion readings are deliberately excluded from the
+  plotted series. Leave every later station gap unfilled.
+  Exact clarification: “Use data only from March 1st fall back to oikOLab until February.”
+- Keep the last `r params$recent_days` completed calendar days and today unfilled.
+  Do not replace missing recent observations, extrapolate, or use GFS.
+- The user explicitly requests a composite: retain each metric's provenance and
+  display fallback separately. It is not a homogeneous station climate series.
+- Reference: the same Oikolab city grid, 1981 through `r chart_year - 1`, with
+  current-year observations excluded. These are city references, not locality normals.
+- Rain accumulation stops after an unresolved missing day until the next month.
+  Mixed-source months remain visibly marked. The requested zero-rain assumption
+  applies to the historical ERA5 portion; later WeatherUnion gaps remain unfilled.
+- Stop or narrow if keys repeat, sources cannot be identified, or the requested
+  station does not exist. Any apparent spatial difference that depends on fallback
+  is weakened; local rankings require matched WeatherUnion days.
+
+## First, check the station archive
+
+```{r stations}
+open_dataset(file.path(root_dir, "data/weatherunion_bengaluru_hourly.parquet")) -> archive
+archive %>%
+  distinct(locality_id, current_locality_name) %>%
+  collect() %>%
+  filter(current_locality_name %in% params$localities) -> stations
+stopifnot(nrow(stations) == length(params$localities))
+start_ist <- as.POSIXct(as.character(first_day), tz = "Asia/Kolkata")
+end_ist <- as.POSIXct(as.character(last_complete_day + 1), tz = "Asia/Kolkata")
+archive %>%
+  filter(
+    locality_id %in% stations$locality_id,
+    hour_ist >= start_ist,
+    hour_ist < end_ist
+  ) %>%
+  collect() %>%
+  mutate(date = as.Date(hour_ist, tz = "Asia/Kolkata")) -> wu
+stopifnot(!anyDuplicated(wu[c("locality_id", "hour_ist")]))
+stopifnot(all(wu$rain_mm >= 0 | is.na(wu$rain_mm)))
+wu %>%
+  summarise(
+    first = min(date),
+    latest = max(date),
+    observed_hours = n(),
+    valid_temperature_hours = sum(is.finite(temperature_c)),
+    valid_rain_hours = sum(is.finite(rain_mm)),
+    .by = locality_id
+  ) %>%
+  left_join(stations, by = "locality_id") %>%
+  mutate(expected_hours = as.integer(latest - first + 1) * 24) -> coverage
+coverage
+wu %>%
+  summarise(
+    temp_hours = sum(is.finite(temperature_c)),
+    rain_hours = sum(is.finite(rain_mm)),
+    low = if (temp_hours == 24) min(temperature_c) else NA_real_,
+    high = if (temp_hours == 24) max(temperature_c) else NA_real_,
+    rain = if (rain_hours == 24) sum(rain_mm) else NA_real_,
+    .by = c(locality_id, date)
+  ) -> wu_daily
+wu_daily %>%
+  summarise(
+    days_with_rows = n(),
+    full_temp_days = sum(temp_hours == 24),
+    full_rain_days = sum(rain_hours == 24),
+    .by = locality_id
+  ) %>%
+  left_join(stations, by = "locality_id")
+```
+
+All three selected stations have 206 complete days each, covering every hour
+from February 22 through September 15 for both temperature and rainfall.
+Hourly coverage does not guarantee all 60 minutes were sampled or certify sensor accuracy.
+
+## Prepare the city reference separately
+
+Use explicit IST dates for both sources. ERA5 samples are on the half-hour in IST;
+WeatherUnion timestamps name hourly intervals. Their daily summaries are comparable
+context, not identical measurement procedures.
+
+```{r era5}
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+as_tibble(blrTemp) %>%
+  filter(Source == "era5") %>%
+  transmute(
+    timestamp = DT,
+    date = as.Date(DT, tz = "Asia/Kolkata"),
+    temp = as.numeric(Temp)
+  ) -> era_temp
+as_tibble(blrRain) %>%
+  filter(Source == "era5") %>%
+  transmute(
+    timestamp = DT,
+    date = as.Date(DT, tz = "Asia/Kolkata"),
+    rain = as.numeric(Rain)
+  ) -> era_rain
+stopifnot(!anyDuplicated(era_temp$timestamp), !anyDuplicated(era_rain$timestamp))
+era_temp %>%
+  summarise(
+    hours = sum(is.finite(temp)),
+    era_low = if (hours > 0) min(temp, na.rm = TRUE) else NA_real_,
+    era_high = if (hours > 0) max(temp, na.rm = TRUE) else NA_real_,
+    .by = date
+  ) -> era_temp_daily
+era_rain %>%
+  summarise(
+    hours = sum(is.finite(rain)),
+    # Match the daily chart: absent rainfall contributes zero, per user instruction.
+    era_rain = sum(rain, na.rm = TRUE),
+    .by = date
+  ) -> era_rain_daily
+era_temp_daily %>%
+  select(-hours) %>%
+  full_join(select(era_rain_daily, -hours), by = "date") %>%
+  arrange(date) %>%
+  mutate(yr = year(date), month = month(date), day = day(date)) -> era_daily
+era_daily %>%
+  summarise(
+    first_available_temp = min(date[is.finite(era_low)]),
+    latest_available_temp = max(date[is.finite(era_low)]),
+    latest_available_rain = max(date[is.finite(era_rain)])
+  )
+era_daily %>%
+  filter(yr < chart_year, is.finite(era_low), is.finite(era_high)) %>%
+  summarise(
+    reference_low = min(era_low),
+    reference_high = max(era_high),
+    normal_low = median(era_low),
+    normal_high = median(era_high),
+    reference_years = n(),
+    .by = c(month, day)
+  ) %>%
+  mutate(date = make_date(chart_year, month, day)) %>%
+  filter(!is.na(date)) -> temp_reference
+era_daily %>%
+  filter(yr < chart_year) %>%
+  group_by(yr, month) %>%
+  filter(n() == days_in_month(first(date)), all(is.finite(era_rain))) %>%
+  arrange(date, .by_group = TRUE) %>%
+  mutate(cumulative = cumsum(era_rain)) %>%
+  ungroup() %>%
+  summarise(
+    p10 = quantile(cumulative, 0.10),
+    p25 = quantile(cumulative, 0.25),
+    median = median(cumulative),
+    p75 = quantile(cumulative, 0.75),
+    p90 = quantile(cumulative, 0.90),
+    reference_years = n(),
+    .by = c(month, day)
+  ) %>%
+  mutate(date = make_date(chart_year, month, day)) %>%
+  filter(!is.na(date), date <= last_complete_day) -> rain_reference
+```
+
+## Keep the source with every value
+
+```{r composite}
+crossing(
+  locality_id = stations$locality_id,
+  date = seq(first_day, last_complete_day, by = "day")
+) %>%
+  left_join(stations, by = "locality_id") %>%
+  left_join(select(coverage, locality_id, first), by = "locality_id") %>%
+  left_join(wu_daily, by = c("locality_id", "date")) %>%
+  left_join(select(era_daily, date, era_low, era_high, era_rain), by = "date") %>%
+  mutate(
+    fallback_allowed = date < recent_start & date < local_start,
+    temp_source = case_when(
+      date >= local_start & is.finite(low) & is.finite(high) ~ "WeatherUnion",
+      fallback_allowed & is.finite(era_low) & is.finite(era_high) ~ "Oikolab fallback",
+      TRUE ~ "Missing"
+    ),
+    rain_source = case_when(
+      date >= local_start & is.finite(rain) ~ "WeatherUnion",
+      fallback_allowed ~ "Oikolab fallback",
+      TRUE ~ "Missing"
+    ),
+    low = case_when(
+      temp_source == "WeatherUnion" ~ low,
+      temp_source == "Oikolab fallback" ~ era_low,
+      TRUE ~ NA_real_
+    ),
+    high = case_when(
+      temp_source == "WeatherUnion" ~ high,
+      temp_source == "Oikolab fallback" ~ era_high,
+      TRUE ~ NA_real_
+    ),
+    rain = case_when(
+      rain_source == "WeatherUnion" ~ rain,
+      rain_source == "Oikolab fallback" ~ coalesce(era_rain, 0),
+      TRUE ~ NA_real_
+    ),
+    month = month(date)
+  ) %>%
+  group_by(locality_id, month) %>%
+  arrange(date, .by_group = TRUE) %>%
+  mutate(
+    cumulative = cumsum(rain),
+    cumulative_has_fallback = cumany(rain_source == "Oikolab fallback"),
+    cumulative_source = case_when(
+      is.na(cumulative) ~ "Missing",
+      cumulative_has_fallback ~ "Includes Oikolab fallback",
+      TRUE ~ "WeatherUnion"
+    )
+  ) %>%
+  ungroup() -> daily
+# These are data-integrity checks on the actual analysis, not a test suite.
+stopifnot(!anyDuplicated(daily[c("locality_id", "date")]))
+stopifnot(!any(daily$temp_source == "Oikolab fallback" & daily$date >= recent_start))
+stopifnot(!any(daily$rain_source == "Oikolab fallback" & daily$date >= recent_start))
+daily %>%
+  count(current_locality_name, temp_source, rain_source) -> source_counts
+source_counts
+stopifnot(!any(daily$temp_source == "Oikolab fallback" & daily$date >= local_start))
+stopifnot(!any(daily$rain_source == "Oikolab fallback" & daily$date >= local_start))
+stopifnot(!any(daily$temp_source == "WeatherUnion" & daily$date < local_start))
+stopifnot(!any(daily$rain_source == "WeatherUnion" & daily$date < local_start))
+# Sensitivity: does a 20-hour rule rescue many WeatherUnion days?
+wu_daily %>%
+  summarise(
+    temp_days_24h = sum(temp_hours == 24),
+    temp_days_20h = sum(temp_hours >= 20),
+    rain_days_24h = sum(rain_hours == 24),
+    .by = locality_id
+  ) %>%
+  left_join(stations, by = "locality_id")
+```
+
+## Make the three charts
+
+Keep the daily range bars and monthly rainfall curves from the existing chart.
+Use identical axes for the three places. The existing plum colour means station
+observations; charcoal means fallback. For rainfall, charcoal means the running
+monthly total includes at least one fallback day, even if later days are local.
+The city reference stays in the existing muted beige palette. Solid versus dashed
+rain lines reinforce provenance without relying solely on hue.
+
+The canvas reserves headings outside each panel, a short source key under each
+panel title, and four footer lines. Whole-degree temperature ticks and 50 mm rain
+ticks are enough for the spread; no daily labels compete with the annual pattern.
+The axes remain because readers need to estimate hundreds of unlabelled values.
+
+```{r build-charts, results='hide'}
+source_colours <- c(
+  "WeatherUnion" = weather_palette$actual,
+  "Oikolab fallback" = "#52616a",
+  "Includes Oikolab fallback" = "#52616a"
+)
+temp_limits <- range(
+  temp_reference$reference_low,
+  temp_reference$reference_high,
+  daily$low,
+  daily$high,
+  na.rm = TRUE
+)
+temp_limits <- c(floor(temp_limits[1] / 4) * 4, ceiling(temp_limits[2] / 4) * 4)
+rain_top <- ceiling(max(daily$cumulative, rain_reference$p90, na.rm = TRUE) / 50) * 50
+month_breaks <- weather_month_midpoints(chart_year)
+x_scale <- function(position = "bottom") {
+  scale_x_date(
+    limits = c(first_day - 1, last_day + 1),
+    breaks = month_breaks$x,
+    labels = toupper(month.abb),
+    position = position,
+    expand = c(0, 0)
+  )
+}
+base_theme <- weather_chart_theme(base_size = 11) +
+  theme(
+    axis.line.y.right = element_blank(),
+    axis.title.y = element_text(size = 10),
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 10, margin = margin(b = 9)),
+    legend.position = "none",
+    plot.margin = margin(10, 12, 10, 12)
+  )
+plots <- list()
+for (place in params$localities) {
+  daily %>%
+    filter(current_locality_name == place) -> d
+  ggplot(temp_reference, aes(x = date)) +
+    geom_vline(
+      xintercept = weather_month_starts(chart_year),
+      colour = weather_palette$normal,
+      linewidth = 0.25
+    ) +
+    geom_ribbon(
+      aes(ymin = reference_low, ymax = reference_high),
+      fill = weather_palette$record
+    ) +
+    geom_ribbon(
+      aes(ymin = normal_low, ymax = normal_high),
+      fill = weather_palette$normal
+    ) +
+    geom_linerange(
+      data = filter(d, temp_source != "Missing"),
+      aes(ymin = low, ymax = high, colour = temp_source),
+      linewidth = 0.85
+    ) +
+    scale_colour_manual(values = source_colours) +
+    x_scale("top") +
+    scale_y_continuous(breaks = seq(temp_limits[1], temp_limits[2], 4)) +
+    coord_cartesian(ylim = temp_limits) +
+    labs(
+      title = "Temperature",
+      subtitle = "Daily range: plum = WeatherUnion; charcoal = Oikolab fallback. Beige = city history; darker beige = median high/low.",
+      x = NULL,
+      y = "°C"
+    ) +
+    base_theme -> temperature_plot
+  ggplot(rain_reference, aes(x = date, group = month)) +
+    geom_vline(
+      xintercept = weather_month_starts(chart_year),
+      colour = weather_palette$normal,
+      linewidth = 0.25
+    ) +
+    geom_ribbon(aes(ymin = p10, ymax = p90), fill = weather_palette$band_outer) +
+    geom_ribbon(aes(ymin = p25, ymax = p75), fill = weather_palette$band_inner) +
+    geom_line(aes(y = median), colour = weather_palette$normal, linewidth = 0.55) +
+    geom_line(
+      data = d,
+      aes(y = cumulative, colour = cumulative_source, linetype = cumulative_source),
+      linewidth = 0.85,
+      na.rm = TRUE
+    ) +
+    scale_colour_manual(values = source_colours) +
+    scale_linetype_manual(
+      values = c("WeatherUnion" = "solid", "Includes Oikolab fallback" = "22", "Missing" = "solid")
+    ) +
+    x_scale() +
+    scale_y_continuous(breaks = seq(0, rain_top, 50)) +
+    coord_cartesian(ylim = c(0, rain_top)) +
+    labs(
+      title = "Rain accumulated within each month",
+      subtitle = "Solid plum = WeatherUnion only; dashed charcoal = includes fallback. Beige = city 10–90% / 25–75% bands; thin line = median.",
+      x = NULL,
+      y = "mm"
+    ) +
+    base_theme -> rain_plot
+  local_days <- sum(d$temp_source == "WeatherUnion")
+  fallback_days <- sum(d$temp_source == "Oikolab fallback")
+  missing_days <- sum(d$temp_source == "Missing")
+  latest_local <- max(d$date[d$temp_source == "WeatherUnion"])
+  caption <- paste0(
+    "Sources: WeatherUnion station observations; Oikolab ERA5 city grid. Historical reference: 1981–", chart_year - 1,
+    ". Station hourly-mean extrema are not minute-level extremes.\n",
+    "Temperature coverage: ", local_days, " local days; ", fallback_days, " fallback days; ", missing_days,
+    " unfilled days. Latest complete local day: ", format(latest_local, "%d %b"), ".\n",
+    "Oikolab before ", format(local_start, "%d %b"), "; WeatherUnion from then onward. Later gaps stay blank. City history is not a locality record.\n",
+    "Oikolab uses available temperature extrema; missing historical rainfall counts as zero, as in the daily chart."
+  )
+  temperature_plot / rain_plot +
+    plot_layout(heights = c(1.65, 1)) +
+    plot_annotation(
+      title = paste0(place, "'s weather in ", chart_year),
+      subtitle = paste0("Bangalore | Through ", format(last_complete_day, "%d %B"), " | Local observations with historical city fallback"),
+      caption = caption,
+      theme = theme(
+        plot.background = element_rect(fill = weather_palette$background, colour = NA),
+        plot.title = element_text(family = "serif", size = 24, face = "bold", colour = weather_palette$text),
+        plot.subtitle = element_text(family = "serif", size = 12, margin = margin(b = 10)),
+        plot.caption = element_text(family = "serif", size = 9, hjust = 0, lineheight = 1.25, margin = margin(t = 10)),
+        plot.margin = margin(16, 18, 14, 18)
+      )
+    ) -> p
+  plots[[place]] <- p
+  ggsave(
+    file.path(chart_dir, paste0(tolower(place), "-weather-", chart_year, ".png")),
+    p,
+    width = 15,
+    height = 8.5,
+    dpi = 180,
+    device = ragg::agg_png,
+    bg = weather_palette$background
+  )
+}
+```
+
+```{r banashankari, echo=FALSE}
+plots[["Banashankari"]]
+```
+
+Banashankari contributes 199 complete local days from March 1 through September 15,
+matching the other two selected stations; January and February use the same city fallback.
+
+```{r indiranagar, echo=FALSE}
+plots[["Indiranagar"]]
+```
+
+Indiranagar has 199 uninterrupted complete days in the selected March 1–September 15 window.
+January and February rainfall curves now sum the available ERA5 readings, with
+missing hours contributing zero as requested, matching the daily chart convention.
+
+```{r bellandur, echo=FALSE}
+plots[["Bellandur"]]
+```
+
+Bellandur also contributes 199 complete local days, the same coverage as Indiranagar.
+Their local rainfall curves can be compared directly from March onward.
+
+## Checks and verdict
+
+The full date grid preserves absent days, and missing recent values never select
+ERA5. A 20-hour temperature threshold does not rescue any additional days in this
+snapshot. Historical rainfall uses the requested zero assumption; unresolved
+WeatherUnion gaps still stop monthly accumulation. References exclude 2026 and GFS; axes match across localities.
+Rendered outputs are inspected for source identification, complete units, shared
+scales, clipping and text overlap. The full-year temperature context is retained
+as requested; rain reference bands stop at the reporting date.
+
+Insightful: no
+
+These charts establish that the proposed format is feasible for all three selected
+stations. The common city fallback ends February 28, using available readings
+and assuming zero rainfall for missing historical hours as requested. They do not yet establish a robust
+new climate or neighbourhood claim beyond a daily-chart reading, so there is no
+blog publication or change to the scheduled daily chart job.
+
+Charts:
+
+- `docs/assets/analysis/banashankari-weather-2026.png`
+- `docs/assets/analysis/indiranagar-weather-2026.png`
+- `docs/assets/analysis/bellandur-weather-2026.png`
+
+Blog post: not published; RSS and homepage unchanged.

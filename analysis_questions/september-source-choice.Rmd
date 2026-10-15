@@ -1,0 +1,245 @@
+---
+title: "Which source should September's rain chart use?"
+question: "Should September 2026 rainfall on the daily site use the earlier GFS values instead of ERA5?"
+trigger_prompt: "the era5 data for this motnh is suerly borken . if you look at the data ferom weather.karthiks.co and compare it to teh weatherunion data it's very clear that hte former is not rreliable. maybe just for this month we should overwrite the gfs data  was far more reliable. waht's the best w3ya of doing this?"
+slug: "september-source-choice"
+date: "2026-09-29"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(arrow)
+library(tidyverse)
+
+root_dir <- normalizePath("..")
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+This is a source-choice check for the daily rain chart, not a climate finding.
+Compare September 1–27, the latest complete days shared by the local WeatherUnion
+snapshot and the Oikolab archive. One Oikolab point is compared with separate
+station totals; the station median is a description of the sampled localities,
+not an estimate of a single citywide gauge. Count only stations with all 648
+hours and 648 valid derived rainfall measurements. The case for using the older
+GFS values would weaken if the station totals were near the current Oikolab
+total, or if missing station hours explained the difference. Old GFS hourly
+values would be needed to reproduce the earlier chart exactly. Oikolab's
+archived 00Z runs allow a separate GFS reconstruction.
+
+## First, check the stored Oikolab source window
+
+The updater groups `DT` into dates with `as.Date(DT)`, which uses UTC for this
+POSIXct object. Here the comparison is a complete September 1–27 IST window;
+the site CSV is checked separately because it now uses the GFS override.
+
+```{r oikolab-coverage}
+start_ist <- as.POSIXct("2026-09-01", tz = "Asia/Kolkata")
+end_ist <- as.POSIXct("2026-09-28", tz = "Asia/Kolkata")
+
+blrRain %>%
+  as_tibble() %>%
+  mutate(
+    hour_ist = as.POSIXct(
+      format(DT, tz = "Asia/Kolkata", usetz = FALSE),
+      tz = "Asia/Kolkata"
+    ),
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  filter(hour_ist >= start_ist, hour_ist < end_ist) ->
+  oikolab_september
+
+oikolab_september %>%
+  summarise(
+    hours = n(),
+    expected_hours = 27 * 24,
+    duplicate_hours = sum(duplicated(hour_ist)),
+    missing_rain = sum(is.na(rain_mm)),
+    rain_mm = sum(rain_mm),
+    .by = Source
+  )
+
+read_csv(
+  file.path(root_dir, "docs", "data", "bangalore_daily_weather.csv"),
+  show_col_types = FALSE
+) %>%
+  filter(
+    DT >= as.Date("2026-09-01"),
+    DT <= as.Date("2026-09-27")
+  ) %>%
+  summarise(days = n(), rain_mm = sum(Rain))
+```
+
+## Now compare complete WeatherUnion stations
+
+`rain_mm` is derived from station accumulation changes. Missing hours are not
+treated as dry. Keep the point series and the station distribution separate.
+
+```{r weatherunion-coverage}
+open_dataset(
+  file.path(root_dir, "data", "weatherunion_bengaluru_hourly.parquet")
+) %>%
+  filter(hour_ist >= start_ist, hour_ist < end_ist) %>%
+  summarise(
+    hours = n(),
+    valid_rain_hours = sum(!is.na(rain_mm)),
+    rain_mm = sum(rain_mm, na.rm = TRUE),
+    .by = c(locality_id, current_locality_name)
+  ) %>%
+  collect() ->
+  station_totals
+
+station_totals %>%
+  count(hours, valid_rain_hours, sort = TRUE)
+
+station_totals %>%
+  filter(hours == 648, valid_rain_hours == 648) ->
+  complete_stations
+
+complete_stations %>%
+  summarise(
+    stations = n(),
+    min_mm = min(rain_mm),
+    median_mm = median(rain_mm),
+    max_mm = max(rain_mm)
+  )
+```
+
+The September 23 archived chart covered data through September 22. Check that
+cutoff separately before comparing its rounded 90 mm label.
+
+```{r archived-chart-cutoff}
+open_dataset(
+  file.path(root_dir, "data", "weatherunion_bengaluru_hourly.parquet")
+) %>%
+  filter(
+    hour_ist >= start_ist,
+    hour_ist < as.POSIXct("2026-09-23", tz = "Asia/Kolkata")
+  ) %>%
+  summarise(
+    hours = n(),
+    valid_rain_hours = sum(!is.na(rain_mm)),
+    rain_mm = sum(rain_mm, na.rm = TRUE),
+    .by = locality_id
+  ) %>%
+  collect() %>%
+  filter(hours == 22 * 24, valid_rain_hours == 22 * 24) %>%
+  summarise(stations = n(), median_mm = median(rain_mm))
+```
+
+The complete stations' September 1–27 totals range from 55.6 to 154.2 mm,
+with a median of 95.6 mm. After the September 29 daily refresh, the stored
+Oikolab archive totals 25.71 mm for the same window (22.82 mm ERA5, 2.89 mm
+GFS). Before the override, the September 28 site CSV reported 22.65 mm
+through September 27. WeatherUnion therefore gives strong evidence that the
+earlier rain chart was unrepresentative of these observed localities. It does
+not establish that every
+ERA5 variable is wrong or that the old GFS forecasts were accurate by day.
+
+## Can we use an archived GFS series?
+
+The [earlier audit](september-rain-revisions.html) found that the archived chart
+label was 90 mm on September 23, 62 mm on September 25, and 23 mm on September
+28. The September 1–22 WeatherUnion median is 95.6 mm, close to the first
+rounded chart label, though daily rain and observation sites differ. The update
+job replaces older GFS hours with ERA5 and overwrites the RData; it keeps no
+hourly revision history. Archived PNGs preserve rounded labels, not the exact
+old hourly values. But Oikolab's `/archivedforecast` endpoint retains 00Z GFS
+runs. I fetched 29 runs (August 31 through September 28), selected forecast
+lead hours 1–24 from each, and saved them with cycle and lead-hour provenance
+in `data/oikolab_gfs_00z_2026-09.csv`.
+This is a consistent reconstruction, not the exact earlier chart series.
+
+```{r archived-gfs}
+read_csv(
+  file.path(root_dir, "data", "oikolab_gfs_00z_2026-09.csv"),
+  show_col_types = FALSE
+) %>%
+  mutate(
+    hour_utc = as.POSIXct(
+      hour_utc,
+      format = "%Y-%m-%dT%H:%M:%SZ",
+      tz = "UTC"
+    ),
+    hour_ist = as.POSIXct(
+      format(hour_utc, tz = "Asia/Kolkata", usetz = FALSE),
+      tz = "Asia/Kolkata"
+    ),
+    date = as.Date(hour_ist, tz = "Asia/Kolkata")
+  ) %>%
+  filter(hour_ist >= start_ist, hour_ist < end_ist) ->
+  gfs_hourly
+
+gfs_hourly %>%
+  summarise(
+    hours = n(),
+    duplicate_hours = sum(duplicated(hour_utc)),
+    missing_rain = sum(is.na(rain_mm)),
+    rain_mm = sum(rain_mm)
+  )
+
+gfs_hourly %>%
+  summarise(gfs_mm = sum(rain_mm), .by = date) ->
+  gfs_daily
+
+open_dataset(
+  file.path(root_dir, "data", "weatherunion_bengaluru_hourly.parquet")
+) %>%
+  filter(
+    hour_ist >= start_ist,
+    hour_ist < end_ist,
+    locality_id %in% complete_stations$locality_id
+  ) %>%
+  collect() %>%
+  mutate(date = as.Date(hour_ist, tz = "Asia/Kolkata")) %>%
+  summarise(
+    rain_mm = sum(rain_mm),
+    .by = c(locality_id, date)
+  ) %>%
+  summarise(
+    station_median_mm = median(rain_mm),
+    station_max_mm = max(rain_mm),
+    .by = date
+  ) %>%
+  inner_join(gfs_daily, by = "date") %>%
+  filter(date >= as.Date("2026-09-20"), date <= as.Date("2026-09-21"))
+```
+
+The reconstructed GFS series has 648 distinct valid hours and totals
+110.76 mm, closer to the complete-station monthly median than the stored
+Oikolab total. Its September 21 IST forecast is 66.4 mm, above even the wettest
+complete station's 40 mm that day. Monthly agreement does not establish
+daily accuracy.
+
+Oikolab describes ERA5 as a roughly 31 km historical reanalysis and GFS as a
+forecast model. They are different products. WeatherUnion sensors measure
+particular neighbourhoods and currently come from a manually refreshed local
+archive. A rainfall display should disclose which of these it uses and its
+coverage date. Keep ERA5 rows intact for like-for-like historical analysis.
+
+## Verdict
+
+Insightful: no
+
+The stored Oikolab rain total is much lower than September totals at every complete
+WeatherUnion station. A September-only GFS rainfall display is technically
+possible using the archived 00Z runs and avoids the large monthly undercount.
+It must be labelled as a forecast reconstruction; its September 21 value
+overpredicts every complete WeatherUnion station. Apply any exception to the
+display layer, preserve ERA5 rows, and exclude the mixed-source September
+series from like-for-like records and normals.
+
+This is a data-source repair, not a publishable weather story. The daily chart
+and site CSV now use the September GFS override. No blog post was published.
+
+Charts: none.
+
+Blog post: not published.

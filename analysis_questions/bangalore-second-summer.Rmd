@@ -1,0 +1,163 @@
+---
+title: "Does Bangalore have a second summer?"
+question: "Does Bangalore actually have a second summer later in the year?"
+trigger_prompt: |
+  People used to say that Bangalore has like a second summer in September and October after the Southwest monsoon is gone. Now if you look at the aggregate data in terms of the average temperatures and things like that, that doesn't bear out. I mean it's no higher than July, August, not much higher. But for example, this year, September has been very hot and things like that. So I wanted to understand if it is something that averages are heading. If it is that in certain years, you have September and October which actually go hotter than July and August. And in certain years, maybe because it's very rainy and things like that, it cools down the average. So the question we need to answer here is, does Bangalore actually have a second summer later in the year?
+slug: "bangalore-second-summer"
+date: "2026-09-10"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, dpi = 160)
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(patchwork)
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+analysis_year <- 2026
+```
+
+## Question and definitions
+
+The test is deliberately split into two meanings of “hot”:
+
+- **Afternoon heat:** monthly mean of daily maximum temperature (`High`).
+- **Whole-day warmth:** monthly mean of the midpoint of daily high and low.
+
+The historical comparison uses complete July–October months from 1981–2025. A later month counts as a second-summer month if its value is higher than both July and August in the same year. This is a test of recurrence, not a claim that the later month is hotter than Bangalore’s true pre-monsoon summer (March–May).
+
+## Data checks and preparation
+
+```{r data-prep}
+weather <- read_csv(file.path(root_dir, "docs", "data", "bangalore_daily_weather.csv"), show_col_types = FALSE) %>%
+  mutate(date = ymd(DT), year = year(date), month = month(date),
+         mean_temp = (High + Low) / 2)
+
+monthly <- weather %>%
+  summarise(
+    days = n_distinct(date),
+    mean_high = mean(High, na.rm = TRUE),
+    mean_low = mean(Low, na.rm = TRUE),
+    mean_temp = mean(mean_temp, na.rm = TRUE),
+    rain_mm = sum(Rain, na.rm = TRUE),
+    rainy_days = sum(Rain > 0.1, na.rm = TRUE),
+    days_30 = sum(High >= 30, na.rm = TRUE),
+    .by = c(year, month)
+  ) %>%
+  mutate(expected_days = days_in_month(make_date(year, month, 1))) %>%
+  filter(days == expected_days)
+
+hist <- monthly %>% filter(year >= 1981, year <= 2025, month %in% 7:10)
+coverage <- hist %>% count(year) %>% summarise(years = n(), min_months = min(n), max_months = max(n))
+coverage
+```
+
+The archive has `r nrow(weather)` daily rows from `r min(weather$date)` through `r max(weather$date)`. The historical test has `r nrow(hist)` complete month-years and `r n_distinct(hist$year)` years with all four months present.
+
+## What the averages say
+
+```{r climatology}
+clim <- monthly %>% filter(year >= 1981, year <= 2025) %>%
+  group_by(month) %>% summarise(
+    mean_high = mean(mean_high), mean_temp = mean(mean_temp),
+    rain_mm = mean(rain_mm), .groups = "drop"
+  ) %>%
+  pivot_longer(c(mean_high, mean_temp), names_to = "measure", values_to = "temperature") %>%
+  mutate(measure = recode(measure, mean_high = "Mean daily high", mean_temp = "Mean whole-day temperature"))
+
+p_clim <- ggplot(clim, aes(month, temperature, colour = measure)) +
+  geom_line(linewidth = 1) + geom_point(size = 2) +
+  annotate("rect", xmin = 6.5, xmax = 8.5, ymin = -Inf, ymax = Inf, alpha = .06, fill = "#777777") +
+  annotate("text", x = 7.5, y = max(clim$temperature) - .15, label = "July–August", colour = "#666666", size = 3) +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  scale_y_continuous(labels = label_number(accuracy = .1, suffix = "°C")) +
+  scale_colour_manual(values = c("Mean daily high" = "#C43C39", "Mean whole-day temperature" = "#2255A4")) +
+  labs(title = "September is a small afternoon-heat bump, not a second summer",
+       subtitle = "1981–2025 climatological monthly averages; the main summer is still March–May",
+       x = NULL, y = NULL, colour = NULL, caption = "Bangalore daily ERA5 archive; complete months only.") +
+  theme_minimal(base_size = 11) + theme(legend.position = "top", panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(), plot.title = element_text(face = "bold"))
+p_clim
+
+ggsave(file.path(chart_dir, "bangalore-second-summer-climatology.png"), p_clim, width = 11, height = 6, dpi = 160, bg = "white")
+```
+
+Historically, September’s mean daily high is `r round(mean(clim$temperature[clim$measure == "Mean daily high" & clim$month == 9]), 2)`°C, versus `r round(mean(clim$temperature[clim$measure == "Mean daily high" & clim$month == 7]), 2)`°C in July and `r round(mean(clim$temperature[clim$measure == "Mean daily high" & clim$month == 8]), 2)`°C in August. But whole-day temperature does not peak in September: cooler nights offset the slightly warmer afternoons.
+
+## Does it happen in individual years?
+
+```{r year-comparison}
+wide <- hist %>% select(year, month, mean_high, mean_temp, rain_mm, days_30) %>% pivot_wider(names_from = month, values_from = c(mean_high, mean_temp, rain_mm, days_30))
+results <- tibble(
+  measure = c("Mean daily high", "Mean whole-day temperature", "Days with high >= 30°C"),
+  september_years = c(sum(wide$mean_high_9 > pmax(wide$mean_high_7, wide$mean_high_8)),
+                      sum(wide$mean_temp_9 > pmax(wide$mean_temp_7, wide$mean_temp_8)),
+                      sum(wide$days_30_9 > pmax(wide$days_30_7, wide$days_30_8))),
+  october_years = c(sum(wide$mean_high_10 > pmax(wide$mean_high_7, wide$mean_high_8)),
+                    sum(wide$mean_temp_10 > pmax(wide$mean_temp_7, wide$mean_temp_8)),
+                    sum(wide$days_30_10 > pmax(wide$days_30_7, wide$days_30_8)))
+) %>% mutate(total_years = nrow(wide), september_share = september_years / total_years, october_share = october_years / total_years)
+results
+
+rain_effect <- hist %>% filter(month %in% 9:10) %>% group_by(month) %>% summarise(
+  rain_high_correlation = cor(rain_mm, mean_high),
+  dry_half_high = mean(mean_high[rain_mm <= median(rain_mm)]),
+  wet_half_high = mean(mean_high[rain_mm > median(rain_mm)]), .groups = "drop")
+rain_effect
+```
+
+## The year-by-year pattern
+
+```{r annual-differences}
+differences <- hist %>%
+  select(year, month, mean_high, mean_temp) %>%
+  pivot_wider(names_from = month, values_from = c(mean_high, mean_temp)) %>%
+  transmute(year,
+            September = mean_high_9 - (mean_high_7 + mean_high_8) / 2,
+            October = mean_high_10 - (mean_high_7 + mean_high_8) / 2) %>%
+  pivot_longer(-year, names_to = "month", values_to = "difference")
+
+p_diff <- ggplot(differences, aes(month, difference)) +
+  geom_hline(yintercept = 0, colour = "#555555", linewidth = .5) +
+  geom_boxplot(width = .28, outlier.shape = NA, fill = "#E7EDF5", colour = "#55739A") +
+  geom_jitter(width = .10, height = 0, alpha = .55, size = 1.6, colour = "#C43C39") +
+  scale_y_continuous(labels = label_number(accuracy = .1, suffix = "°C")) +
+  labs(title = "September’s rebound is real, but it is not guaranteed",
+       subtitle = "Difference between that month’s mean daily high and the same year’s July–August average",
+       x = NULL, y = NULL, caption = "Each point is one year, 1981–2025. Above zero means the later month was hotter.") +
+  theme_minimal(base_size = 11) + theme(panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(), plot.title = element_text(face = "bold"))
+p_diff
+
+ggsave(file.path(chart_dir, "bangalore-second-summer-year-differences.png"), p_diff, width = 8, height = 5.5, dpi = 160, bg = "white")
+```
+
+September beats both July and August in afternoon heat in `r results$september_years[1]` of `r results$total_years[1]` years (`r percent(results$september_share[1], accuracy = 1)`). October does so in `r results$october_years[1]` years (`r percent(results$october_share[1], accuracy = 1)`). For whole-day warmth, the corresponding shares are only `r percent(results$september_share[2], accuracy = 1)` and `r percent(results$october_share[2], accuracy = 1)`.
+
+Rain matters, but it is not the whole explanation. The September correlation between monthly rain and mean daily high is `r round(rain_effect$rain_high_correlation[rain_effect$month == 9], 2)`; October’s is `r round(rain_effect$rain_high_correlation[rain_effect$month == 10], 2)`. The dry-half versus wet-half difference is larger in October than September, but year-to-year variability remains substantial.
+
+## 2026 so far — a genuine hot September, but incomplete
+
+```{r current}
+current <- weather %>% filter(year == analysis_year, month == 9, day(date) <= 9) %>% summarise(
+  days = n(), mean_high = mean(High), mean_temp = mean(mean_temp), rain_mm = sum(Rain), days_30 = sum(High >= 30))
+prior_same_window <- weather %>% filter(year <= 2025, month == 9, day(date) <= 9) %>% summarise(.by = year, mean_high = mean(High), mean_temp = mean(mean_temp), rain_mm = sum(Rain), days_30 = sum(High >= 30))
+current
+prior_same_window %>% summarise(years = n(), high_rank = 1 + sum(mean_high > current$mean_high), temp_rank = 1 + sum(mean_temp > current$mean_temp), rain_rank_driest = 1 + sum(rain_mm < current$rain_mm))
+```
+
+The first nine days of September 2026 average `r round(current$mean_high, 2)`°C for the daily high and `r round(current$mean_temp, 2)`°C across the day, with only `r round(current$rain_mm, 1)` mm of rain. Against the same 1–9 September window in 1981–2025, that is rank 1 for both heat measures. It is therefore a real hot spell, but it is not evidence by itself that the climatological season has a second summer; the month is incomplete and the comparison is weather variability around a modest September shoulder.
+
+## Verdict
+
+Insightful: yes
+
+Bangalore does have a recurring **September afternoon-heat rebound**, but not a second summer in the stronger, whole-day sense. September’s average daily high is about 0.4°C above July–August, and it beats both months in a little over half of historical years; October is less consistent. Cooler post-monsoon nights mean September’s whole-day temperature is roughly flat with July–August, while October is cooler. Rain suppresses the later-month afternoon high in wetter years, helping explain why the average hides hot, dry exceptions such as September 2026. The chart is saved as `docs/assets/analysis/bangalore-second-summer-climatology.png`.

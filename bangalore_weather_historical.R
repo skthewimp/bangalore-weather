@@ -299,10 +299,12 @@ generate_commentary <- function(stats) {
   normalize_commentary_text(paste(trimws(bullet_lines), collapse = "\n"))
 }
 
-generate_weather_chart <- function(target_year, save_path = NULL, width = 13.5, height = 7.5, commentary = NULL) {
+generate_weather_chart <- function(target_year, save_path = NULL, width = 13.5, height = 7.5, commentary = NULL, rain_override = NULL) {
 
   load(file.path(.script_dir, 'data', 'bangaloreTemperature.RData'))
   load(file.path(.script_dir, 'data', 'bangaloreRainfall.RData'))
+
+  if (!is.null(rain_override)) blrRain <- rain_override
 
   blrTemp %>%
     filter(!is.na(Temp)) %>%

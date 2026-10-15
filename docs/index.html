@@ -222,6 +222,61 @@ h1 {
   width: 100%;
 }
 
+.hero-chart a {
+  display: block;
+  cursor: zoom-in;
+}
+
+.hero-chart a:focus-visible {
+  outline: 3px solid var(--teal);
+  outline-offset: 4px;
+}
+
+html.chart-viewer-open {
+  overflow: hidden;
+}
+
+.chart-viewer {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 48px 20px 20px;
+  border: 0;
+  background: transparent;
+}
+
+.chart-viewer[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-viewer::backdrop {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.chart-viewer img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.chart-viewer-close {
+  position: absolute;
+  top: 8px;
+  right: 20px;
+  padding: 6px 12px;
+  border: 1px solid white;
+  border-radius: 4px;
+  background: #222;
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+
 .insights {
   margin-top: 24px;
   display: grid;
@@ -553,7 +608,9 @@ h2 a {
       <span>Hourly archive, daily refresh</span>
     </div>
     <div class="hero-chart">
-      <img id="latest-chart" src="assets/latest.png" width="4050" height="2250" alt="Latest Bangalore weather chart showing daily temperature ranges and cumulative rainfall.">
+      <a id="latest-chart-link" href="assets/latest.png" aria-label="Open the latest Bangalore weather chart at full browser size" title="Open chart at full browser size">
+        <img id="latest-chart" src="assets/latest.png" width="4050" height="2250" alt="Latest Bangalore weather chart showing daily temperature ranges and cumulative rainfall.">
+      </a>
     </div>
     <div class="insights" id="insights" aria-label="Latest weather notes">
       <div class="insight">Latest notes load from the daily weather run.</div>
@@ -757,7 +814,50 @@ h2 a {
   </div>
 </footer>
 
+<dialog id="chart-viewer" class="chart-viewer" aria-label="Full-size Bangalore weather chart">
+  <button class="chart-viewer-close" type="button" autofocus>Close ×</button>
+  <img id="chart-viewer-image" alt="Latest Bangalore weather chart showing daily temperature ranges and cumulative rainfall.">
+</dialog>
+
 <script>
+const chartViewer = document.getElementById("chart-viewer");
+const chartLink = document.getElementById("latest-chart-link");
+
+function openChartViewer() {
+  document.getElementById("chart-viewer-image").src = chartLink.href;
+  if (!chartViewer.open) chartViewer.showModal();
+  document.documentElement.classList.add("chart-viewer-open");
+}
+
+function closeChartViewer() {
+  if (!chartViewer.open) return;
+  chartViewer.close();
+  document.documentElement.classList.remove("chart-viewer-open");
+  chartLink.focus({ preventScroll: true });
+  if (history.state?.chartViewer) history.back();
+}
+
+chartLink.addEventListener("click", (event) => {
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  if (typeof chartViewer.showModal !== "function") return;
+  event.preventDefault();
+  history.pushState({ ...history.state, chartViewer: true }, "");
+  openChartViewer();
+});
+
+chartViewer.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeChartViewer();
+});
+chartViewer.addEventListener("click", (event) => {
+  if (event.target === chartViewer) closeChartViewer();
+});
+chartViewer.querySelector("button").addEventListener("click", closeChartViewer);
+window.addEventListener("popstate", () => {
+  if (history.state?.chartViewer) openChartViewer();
+  else closeChartViewer();
+});
+
 function formatDate(value) {
   if (!value) return "";
   const date = new Date(`${value}T00:00:00`);
@@ -819,6 +919,7 @@ async function loadLatest() {
       const imageVersion = latest.as_of || latest.generated_on || Date.now();
       imageUrl.searchParams.set("v", imageVersion);
       chart.src = imageUrl.toString();
+      document.getElementById("latest-chart-link").href = imageUrl.toString();
     }
   } catch (error) {
     // Static fallback content above is good enough if the JSON fetch fails locally.

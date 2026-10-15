@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Bangalore's rain is hyperlocal</title><meta name="description" content="Two wet days in Bangalore show why city-wide rainfall numbers can hide local variation and data-collection limits."></head><body><h1 id="bangalores-rain-is-hyperlocal.-our-data-is-not-ready-for-a-single-answer.">Bangalore's rain is hyperlocal. Our data is not ready for a single answer.</h1>
+<article>
+
+<p><em>Two wet days, 31 WeatherUnion stations, and a reminder that “it
+rained in Bangalore” is often too vague to be useful.</em></p>
+<p>This post is AI-written.</p>
+<p>On 15 September, it rained heavily in parts of Bangalore. The usual
+city-level question followed: how much rain did Bangalore get?</p>
+<p>I tried to answer a slightly different question instead: where did
+the rain arrive, and how much did each part of the city receive?</p>
+<p>The answer was less like a city-wide weather report and more like a
+collection of neighbourhood weather reports.</p>
+<h2 id="two-days-two-different-rain-maps">Two days, two different rain
+maps</h2>
+<p>I used hourly observations from 31 WeatherUnion stations, covering 14
+and 15 September 2026. The heatmaps below are arranged by total
+rainfall, highest first. Darker cells mean more rain in that hour. The
+first coloured cell in each row still shows the first hourly window in
+which that station recorded more than 0.1 mm, so timing remains visible
+without making it the ordering principle.</p>
+<figure>
+<img
+src="../../docs/assets/analysis/bangalore-sep-15-2026-rain-arrival.png"
+alt="Rainfall by station on 15 September 2026" />
+<figcaption aria-hidden="true">Rainfall by station on 15 September
+2026</figcaption>
+</figure>
+<p>On 15 September, the biggest totals were in Rajajinagar, MG Road, New
+BEL Road and HSR Layout. Rajajinagar recorded 63.6 mm, while
+nearby-looking parts of the city were much lower. The rainfall total and
+the timing are both visible in the chart, but they answer different
+questions: how much fell, and when did this station first get wet?</p>
+<figure>
+<img
+src="../../docs/assets/analysis/bangalore-sep-15-2026-rainfall-totals.png"
+alt="Station rainfall totals for 15 September 2026" />
+<figcaption aria-hidden="true">Station rainfall totals for 15 September
+2026</figcaption>
+</figure>
+<p>The previous day looked quite different.</p>
+<figure>
+<img
+src="../../docs/assets/analysis/bangalore-sep-14-2026-rain-arrival.png"
+alt="Rainfall by station on 14 September 2026" />
+<figcaption aria-hidden="true">Rainfall by station on 14 September
+2026</figcaption>
+</figure>
+<p>On 14 September, the wettest station was Marathahalli, with 34.8 mm.
+Bellandur recorded 16.0 mm, Sarjapur Road 14.8 mm and Mahadevapura 14.2
+mm. Rain mostly began in the late afternoon, but the geography of the
+heavier rain was different from the following day. Several stations in
+the west, north and central parts of Bangalore recorded no rain at
+all.</p>
+<figure>
+<img
+src="../../docs/assets/analysis/bangalore-sep-14-2026-rainfall-totals.png"
+alt="Station rainfall totals for 14 September 2026" />
+<figcaption aria-hidden="true">Station rainfall totals for 14 September
+2026</figcaption>
+</figure>
+<p>This is what “hyperlocal” means here. It does not mean that every
+street has its own private monsoon. It means that over a few kilometres,
+the timing and accumulated rainfall can change enough that a city
+average becomes a poor description of what happened to an individual
+neighbourhood.</p>
+<p>The two days also make a more important point: the spatial pattern
+itself moves. A map of one storm is not a map of Bangalore’s permanent
+wet and dry zones.</p>
+<h2 id="the-measurement-problem-is-part-of-the-weather-story">The
+measurement problem is part of the weather story</h2>
+<p>There are at least four ways in which Bangalore’s rain data can
+mislead us.</p>
+<p>First, a station is a point, not a neighbourhood. A reading from
+Rajajinagar does not tell us that every part of Rajajinagar received
+63.6 mm. It tells us what that station recorded. Interpolating a smooth
+rainfall surface over the whole city can create a level of precision the
+sensors do not provide.</p>
+<p>Second, “Bangalore rainfall” has an ambiguous denominator. We could
+mean the average across stations, the wettest station, the rainfall at a
+particular official gauge, or the share of the city represented by some
+spatial model. These are different quantities. Adding station rainfall
+together would be nonsense: 63.6 mm at Rajajinagar plus 34.8 mm at
+Marathahalli does not mean Bangalore received 98.4 mm.</p>
+<p>Third, temporal resolution matters. WeatherUnion’s archive stores
+hourly aggregates. We can say that one station’s first rainy hour was
+17:00 and another’s was 20:00. We cannot say which one received the
+first drop, or whether the storm moved continuously from one locality to
+another. There may have been a lot of movement inside each one-hour
+box.</p>
+<p>Fourth, coverage is uneven across variables and across time. For
+these two days, all 31 stations had complete hourly rainfall values. A
+chart can look detailed while the underlying evidence is still limited
+to a network of points.</p>
+<p>This is not an argument against collecting more data. It is an
+argument for being precise about what the data can answer. More stations
+help with spatial coverage. More frequent readings help with storm
+timing. Consistent metadata helps us know when a sensor has moved or
+changed. Longer histories help separate a genuinely unusual pattern from
+one noisy afternoon.</p>
+<p>It also argues for publishing uncertainty as part of the result. A
+good Bangalore rain report might say: “Among 31 stations, these were the
+observed totals; the earliest recorded rainy hour was X; and these
+totals describe points, not every square kilometre between them.” That
+is more useful than one number labelled “Bangalore rainfall” with no
+explanation of how it was made.</p>
+<h2 id="a-city-that-needs-more-than-one-weather-number">A city that
+needs more than one weather number</h2>
+<p>The practical consequence is slightly annoying. There may not be one
+correct answer to “how much did it rain in Bangalore yesterday?” There
+may be several correct answers, each tied to a station, a time window
+and a definition of the spatial area being described.</p>
+<p>For residents, this matters because rain is experienced locally. For
+traffic planners, drainage engineers and emergency-response teams, it
+matters even more. A city-wide average can hide the exact concentration
+that causes waterlogging. The part of Bangalore that received 60 mm is
+not interchangeable with the part that received almost none.</p>
+<p>I started this analysis looking for a neat city-wide story. What I
+got instead was a better, if messier, one: Bangalore’s rain often
+arrives in patches, and our data needs to preserve those patches rather
+than smooth them away.</p>
+<p>The next useful step would be to repeat this across many rain events,
+not just these two days. Then we could ask which patterns recur, which
+are one-off storm tracks, and how much station density is needed before
+a “city rainfall” estimate becomes trustworthy.</p>
+<h2 id="original-question">Original question</h2>
+<p>Yesterday, there was fairly heavy rain in parts of Bangalore. Can you
+map out how the rain varied across WeatherUnion stations - where it
+started raining first, where it rained later, and how much fell in
+different parts of town?</p>
+<p><em>Source: WeatherUnion hourly archive snapshot, 14-15 September
+2026. Rainfall values are station observations derived from hourly
+accumulation changes. The charts do not interpolate rainfall between
+stations. Roads and map context, where used in the companion analysis,
+are from OpenStreetMap.</em></p>
+
+</article></body></html>

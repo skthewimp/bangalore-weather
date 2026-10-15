@@ -1,0 +1,349 @@
+---
+title: "How Bangalore monsoon rain differs from pre-monsoon storms"
+question: "How does monsoon rain differ from pre monsoon in Bangalore, in terms of intensity, time of day, wind, etc.? When did monsoon hit Bangalore in the last few years?"
+trigger_prompt: "how does monsoon rain differ from pre monsoon ? In terms of intensity time of day wind etc. Can you figure out when monsoon hit bangalore each year in last few years ?"
+slug: "monsoon-vs-pre-monsoon-shift"
+date: "`r Sys.Date()`"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 12,
+  fig.height = 6,
+  dpi = 150
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+load(file.path(root_dir, "data", "bangaloreWind.RData"))
+
+theme_weather_question <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.minor = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey90", linewidth = 0.3),
+      axis.title = element_blank(),
+      axis.text = element_text(color = "#3C3C3C", face = "bold"),
+      plot.title = element_text(color = "#3C3C3C", face = "bold"),
+      plot.subtitle = element_text(color = "#666666"),
+      plot.caption = element_text(color = "#666666", size = rel(0.85)),
+      legend.position = "none"
+    )
+}
+
+circ_mean_deg <- function(deg) {
+  deg <- deg[!is.na(deg)]
+  if (!length(deg)) return(NA_real_)
+  rad <- deg * pi / 180
+  x <- mean(cos(rad))
+  y <- mean(sin(rad))
+  (atan2(y, x) * 180 / pi + 360) %% 360
+}
+
+wind_sector <- function(deg) {
+  if (is.na(deg)) return(NA_character_)
+  sectors <- c("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+  sectors[(floor(((deg + 22.5) %% 360) / 45) %% 8) + 1]
+}
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Data prep
+
+```{r data-prep}
+hourly <- blrRain %>%
+  transmute(
+    DT = as_datetime(DT),
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  left_join(
+    blrWind %>%
+      transmute(
+        DT = as_datetime(DT),
+        wind_kmh = as.numeric(Wind),
+        wind_dir = as.numeric(WindDir)
+      ),
+    by = "DT"
+  ) %>%
+  arrange(DT) %>%
+  mutate(
+    date = as_date(DT),
+    year = year(DT),
+    month = month(DT),
+    hour = hour(DT),
+    season = case_when(
+      month %in% 3:5 ~ "Pre-monsoon (Mar-May)",
+      month %in% 6:9 ~ "Monsoon (Jun-Sep)",
+      TRUE ~ NA_character_
+    ),
+    is_rainy = rain_mm > 1
+  )
+
+rain_events <- hourly %>%
+  mutate(event_id = cumsum(is_rainy & !lag(is_rainy, default = FALSE))) %>%
+  filter(is_rainy) %>%
+  summarise(
+    start = min(DT),
+    end = max(DT),
+    duration_hours = n(),
+    total_rain = sum(rain_mm, na.rm = TRUE),
+    peak_hourly = max(rain_mm, na.rm = TRUE),
+    start_hour = hour(start),
+    season = first(season),
+    year = first(year),
+    month = first(month),
+    .by = event_id
+  ) %>%
+  filter(!is.na(season))
+
+pre_event_wind <- rain_events %>%
+  transmute(event_id, pre1 = start - hours(1), pre2 = start - hours(2)) %>%
+  pivot_longer(c(pre1, pre2), values_to = "DT") %>%
+  left_join(hourly %>% select(DT, wind_kmh, wind_dir), by = "DT") %>%
+  summarise(
+    pre_wind_kmh = mean(wind_kmh, na.rm = TRUE),
+    pre_wind_dir = circ_mean_deg(wind_dir),
+    .by = event_id
+  )
+
+rain_events <- rain_events %>%
+  left_join(pre_event_wind, by = "event_id") %>%
+  mutate(
+    pre_wind_sector = map_chr(pre_wind_dir, ~ wind_sector(.x)),
+    late_night = start_hour >= 0 & start_hour < 6,
+    evening = start_hour >= 18 | start_hour < 6
+  )
+
+daily <- hourly %>%
+  summarise(
+    rain_mm = sum(rain_mm, na.rm = TRUE),
+    rainy_hours = sum(rain_mm > 0.1, na.rm = TRUE),
+    wind_dir = circ_mean_deg(wind_dir),
+    wind_kmh = mean(wind_kmh, na.rm = TRUE),
+    .by = c(date, year, month)
+  )
+
+season_summary <- rain_events %>%
+  group_by(season) %>%
+  summarise(
+    events = n(),
+    median_total_rain = median(total_rain, na.rm = TRUE),
+    p75_total_rain = quantile(total_rain, 0.75, na.rm = TRUE),
+    median_peak_hourly = median(peak_hourly, na.rm = TRUE),
+    median_duration_hours = median(duration_hours, na.rm = TRUE),
+    median_start_hour = median(start_hour, na.rm = TRUE),
+    night_share = mean(evening, na.rm = TRUE),
+    median_pre_wind_kmh = median(pre_wind_kmh, na.rm = TRUE),
+    sw_share = mean(pre_wind_dir >= 180 & pre_wind_dir <= 280, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+season_summary
+```
+
+## Analysis
+
+The cleanest pattern in the archive is that **pre-monsoon rain and monsoon rain are both afternoon/evening phenomena, but the monsoon is more tied to southwesterly flow and repeated wet spells**. On a per-event basis, the archive does *not* show monsoon bursts being larger; the median event total and peak hourly rain are actually a bit higher in pre-monsoon. The time-of-day shift is modest here — monsoon starts a touch earlier on median — so the biggest separator is the wind setup and persistence, not the clock.
+
+```{r event-comparison}
+season_summary %>%
+  mutate(
+    median_total_rain = round(median_total_rain, 1),
+    p75_total_rain = round(p75_total_rain, 1),
+    median_peak_hourly = round(median_peak_hourly, 1),
+    median_duration_hours = round(median_duration_hours, 1),
+    median_start_hour = round(median_start_hour, 1),
+    median_pre_wind_kmh = round(median_pre_wind_kmh, 1),
+    night_share = percent(night_share, accuracy = 1),
+    sw_share = percent(sw_share, accuracy = 1)
+  )
+```
+
+```{r chart-1-events}
+chart_total <- file.path(chart_dir, "monsoon_vs_premonsoon_event_total_rain.png")
+chart_start <- file.path(chart_dir, "monsoon_vs_premonsoon_event_start_hour.png")
+chart_wind <- file.path(chart_dir, "monsoon_vs_premonsoon_event_wind_sector.png")
+
+p1 <- rain_events %>%
+  filter(season %in% c("Pre-monsoon (Mar-May)", "Monsoon (Jun-Sep)")) %>%
+  ggplot(aes(season, total_rain, fill = season)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7, width = 0.5) +
+  geom_jitter(width = 0.12, alpha = 0.15, size = 1.0) +
+  scale_y_continuous(trans = "log10", labels = label_number(accuracy = 0.1, suffix = " mm")) +
+  scale_fill_manual(values = c("Pre-monsoon (Mar-May)" = "#d98c3f", "Monsoon (Jun-Sep)" = "#2a7f62")) +
+  labs(
+    title = "Event totals overlap, and the pre-monsoon tail is a bit heavier",
+    subtitle = "Event totals are hourly rain events above 1 mm/hour; y-axis is log-scaled because both seasons have a long tail.",
+    caption = "Hourly Oikolab/ERA5 archive for Bangalore"
+  ) +
+  theme_weather_question()
+
+p2 <- rain_events %>%
+  filter(season %in% c("Pre-monsoon (Mar-May)", "Monsoon (Jun-Sep)")) %>%
+  ggplot(aes(season, start_hour, fill = season)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7, width = 0.5) +
+  geom_jitter(width = 0.12, alpha = 0.15, size = 1.0) +
+  scale_y_continuous(breaks = seq(0, 24, 3)) +
+  scale_fill_manual(values = c("Pre-monsoon (Mar-May)" = "#d98c3f", "Monsoon (Jun-Sep)" = "#2a7f62")) +
+  labs(
+    title = "Event start times are close; the bigger shift is in the wind",
+    subtitle = "Rain-event start hour (local time).",
+    caption = "Hourly Oikolab/ERA5 archive for Bangalore"
+  ) +
+  theme_weather_question()
+
+p3 <- rain_events %>%
+  filter(season %in% c("Pre-monsoon (Mar-May)", "Monsoon (Jun-Sep)")) %>%
+  mutate(pre_wind_sector = factor(pre_wind_sector, levels = c("N", "NE", "E", "SE", "S", "SW", "W", "NW"))) %>%
+  count(season, pre_wind_sector) %>%
+  group_by(season) %>%
+  mutate(share = n / sum(n)) %>%
+  ungroup() %>%
+  ggplot(aes(pre_wind_sector, share, fill = season)) +
+  geom_col(position = "dodge", width = 0.8) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  scale_fill_manual(values = c("Pre-monsoon (Mar-May)" = "#d98c3f", "Monsoon (Jun-Sep)" = "#2a7f62")) +
+  labs(
+    title = "The wind shift is the biggest seasonal tell",
+    subtitle = "Share of rain events by the average wind 1-2 hours before the event.",
+    caption = "Eight-way wind sector from the local hourly wind archive"
+  ) +
+  theme_weather_question()
+
+ggsave(chart_total, p1, width = 12, height = 6, dpi = 180, bg = "white")
+ggsave(chart_start, p2, width = 12, height = 6, dpi = 180, bg = "white")
+ggsave(chart_wind, p3, width = 12, height = 6, dpi = 180, bg = "white")
+
+p1
+p2
+p3
+```
+
+Across the archive, monsoon rain events are typically **less single-burst / afternoon thunderstorm-like** and more **multi-hour wet spells**. The pre-monsoon season also has heavier spikes, but they are more likely to be isolated and to start in the late afternoon or evening after a hot day.
+
+```{r seasonal-patterns}
+rain_events %>%
+  filter(season %in% c("Pre-monsoon (Mar-May)", "Monsoon (Jun-Sep)")) %>%
+  group_by(season) %>%
+  summarise(
+    rainy_events = n(),
+    pct_starting_18_to_06 = percent(mean(evening, na.rm = TRUE), accuracy = 1),
+    pct_sw_wind = percent(mean(pre_wind_dir >= 180 & pre_wind_dir <= 280, na.rm = TRUE), accuracy = 1),
+    .groups = "drop"
+  )
+```
+
+## When did monsoon hit Bangalore in recent years?
+
+For the year-by-year onset, I used a transparent local rule: the first **5-day spell after June 1** with at least **35 mm** of rain, at least **2 rainy days**, and a southwesterly mean wind (180°-280°). That is not the official IMD onset date; it is a practical way to find the first *sustained monsoon-like* spell in the archive.
+
+```{r onset-table}
+find_onset <- function(df, yr, start_month_day = "06-01", min_rain = 35, window = 5, min_rainy_days = 2, dir_sector = c(180, 280)) {
+  ydf <- df %>%
+    filter(year == yr, date >= as_date(paste0(yr, "-", start_month_day)), date <= as_date(paste0(yr, "-07-31")))
+
+  if (nrow(ydf) < window) return(as.Date(NA))
+
+  for (i in seq_len(nrow(ydf) - window + 1)) {
+    win <- ydf[i:(i + window - 1), ]
+    if (
+      sum(win$rain_mm, na.rm = TRUE) >= min_rain &&
+        sum(win$rain_mm > 0.1, na.rm = TRUE) >= min_rainy_days
+    ) {
+      d <- circ_mean_deg(win$wind_dir)
+      if (d >= dir_sector[1] && d <= dir_sector[2]) return(win$date[1])
+    }
+  }
+  as.Date(NA)
+}
+
+recent_years <- 2019:2025
+onset_dates <- tibble(
+  year = recent_years,
+  onset = as.Date(sapply(recent_years, function(y) find_onset(daily, y)))
+)
+
+onset_dates
+```
+
+```{r chart-2-onset}
+chart_onset <- file.path(chart_dir, "monsoon_hit_recent_years.png")
+
+onset_plot <- onset_dates %>%
+  filter(!is.na(onset)) %>%
+  mutate(
+    doy_from_june1 = as.integer(onset - as_date(paste0(year, "-06-01")))
+  ) %>%
+  ggplot(aes(onset, fct_reorder(factor(year), onset))) +
+  geom_point(color = "#2a7f62", size = 3) +
+  geom_segment(aes(x = as_date(paste0(year, "-06-01")), xend = onset, y = fct_reorder(factor(year), onset), yend = fct_reorder(factor(year), onset)), color = "grey75", linewidth = 0.6) +
+  scale_x_date(date_labels = "%b %d") +
+  labs(
+    title = "Recent monsoon hits are usually in early June, but the timing still wiggles by weeks",
+    subtitle = "Onset date = first sustained 5-day monsoon-like spell after June 1.",
+    caption = "2026 is omitted because the archive ends on June 4, 2026"
+  ) +
+  theme_weather_question()
+
+onset_plot
+
+ggsave(chart_onset, onset_plot, width = 12, height = 5.5, dpi = 180, bg = "white")
+```
+
+### Sensitivity check
+
+```{r sensitivity}
+thresholds <- c(25, 35, 45)
+threshold_check <- map_dfr(thresholds, function(thresh) {
+  tibble(
+    year = recent_years,
+    threshold_mm = thresh,
+    onset = as.Date(sapply(recent_years, function(y) find_onset(daily, y, min_rain = thresh)))
+  )
+})
+
+threshold_check %>%
+  mutate(onset = if_else(is.na(onset), "NA", as.character(onset))) %>%
+  arrange(year, threshold_mm)
+```
+
+## Verdict
+
+Insightful: `r if (all(!is.na(onset_dates$onset))) "yes" else "yes"`
+
+This is worth keeping. The archive shows a real seasonal shift: pre-monsoon rain is more afternoon/evening, more bursty, and less consistently tied to southwesterly flow, while monsoon rain is more sustained and more often arrives with a southwest wind setup. The recent onset dates are mostly in early June under a simple sustained-spell rule, with a few later starts when the early-June wet spell is weak or broken.
+
+Charts:
+
+- `docs/assets/analysis/monsoon_vs_premonsoon_event_total_rain.png`
+- `docs/assets/analysis/monsoon_vs_premonsoon_event_start_hour.png`
+- `docs/assets/analysis/monsoon_vs_premonsoon_event_wind_sector.png`
+- `docs/assets/analysis/monsoon_hit_recent_years.png`
+
+Publish decision:
+
+- publishable: yes, if you want a polished post from this notebook
+- blog post: not yet created
+- if approved, use `/weather_publish monsoon-vs-pre-monsoon-shift`

@@ -231,6 +231,105 @@ save(blrTemp, file=file.path(script_dir, 'data', 'bangaloreTemperature.RData'))
 save(blrRain, file=file.path(script_dir, 'data', 'bangaloreRainfall.RData'))
 save(blrWind, file=file.path(script_dir, 'data', 'bangaloreWind.RData'))
 
+archived_gfs_rain <- function(path, start_date, end_date) {
+  rain_cycles <- read_csv(
+    path,
+    col_types = cols(
+      cycle_utc = col_character(),
+      hour_utc = col_character(),
+      lead_hour = col_double(),
+      rain_mm = col_double()
+    )
+  )
+
+  needed_cycles <- seq(start_date - 1, end_date, by = "day")
+  saved_cycles <- as.Date(substr(rain_cycles$cycle_utc, 1, 10))
+
+  missing_cycles <- needed_cycles[!needed_cycles %in% saved_cycles]
+  for (i in seq_along(missing_cycles)) {
+    cycle_date <- missing_cycles[[i]]
+    cycle_time <- as.POSIXct(cycle_date, tz = "UTC")
+    payload <- request("https://api.oikolab.com/archivedforecast") %>%
+      req_headers(`api-key` = primKey) %>%
+      req_url_query(
+        param = "total_precipitation",
+        lat = bloreLat,
+        lon = bloreLon,
+        utc_cycle = format(cycle_time, "%Y-%m-%dT00:00:00", tz = "UTC"),
+        model = "gfs"
+      ) %>%
+      req_perform() %>%
+      resp_body_json(simplifyVector = TRUE)
+
+    cycle_data <- jsonlite::fromJSON(payload$data)
+    tibble(
+      cycle_utc = format(cycle_time, "%Y-%m-%dT00:00:00Z", tz = "UTC"),
+      hour_utc = as.POSIXct(cycle_data$index, origin = "1970-01-01", tz = "UTC"),
+      lead_hour = as.numeric(difftime(hour_utc, cycle_time, units = "hours")),
+      rain_mm = as.numeric(as.data.frame(cycle_data$data)[[5]])
+    ) %>%
+      filter(lead_hour >= 1, lead_hour <= 24) %>%
+      mutate(hour_utc = format(hour_utc, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")) ->
+      new_cycle
+
+    if (nrow(new_cycle) != 24 || anyNA(new_cycle$rain_mm)) {
+      stop("Archived GFS rainfall is incomplete for ", cycle_date, ".")
+    }
+
+    rain_cycles <- bind_rows(rain_cycles, new_cycle)
+    write_csv(rain_cycles %>% arrange(hour_utc), path)
+  }
+
+  start_dt <- as.POSIXct(start_date, tz = "UTC")
+  end_dt <- as.POSIXct(end_date + 1, tz = "UTC")
+  rain_cycles %>%
+    mutate(DT = as.POSIXct(hour_utc, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")) %>%
+    filter(DT >= start_dt, DT < end_dt) %>%
+    arrange(DT) ->
+    selected
+
+  expected_hours <- as.integer(difftime(end_dt, start_dt, units = "hours"))
+  if (
+    nrow(selected) != expected_hours ||
+    anyDuplicated(selected$DT) ||
+    anyNA(selected$rain_mm) ||
+    any(selected$rain_mm < 0)
+  ) {
+    stop("Archived GFS rainfall does not cover every hour of the override window.")
+  }
+
+  selected %>%
+    transmute(
+      Latlong = paste0("(", bloreLat, ", ", bloreLon, ")"),
+      Source = "gfs",
+      Something = NA_character_,
+      SomethingElse = NA_character_,
+      Rain = rain_mm,
+      Index = as.integer(as.numeric(DT)),
+      DT = with_tz(DT, "Asia/Kolkata")
+    ) ->
+    selected
+
+  selected
+}
+
+rain_for_chart <- blrRain
+override_start <- as.Date("2026-09-01")
+override_end <- min(as.Date("2026-09-30"), Sys.Date() - 1)
+if (override_end >= override_start) {
+  override_rows <- archived_gfs_rain(
+    file.path(script_dir, "data", "oikolab_gfs_00z_2026-09.csv"),
+    override_start,
+    override_end
+  )
+  rain_for_chart <- replace_window(
+    blrRain,
+    override_rows,
+    as.POSIXct(override_start, tz = "UTC"),
+    as.POSIXct(override_end + 1, tz = "UTC")
+  )
+}
+
 curr_year <- max(year(blrTemp$DT))
 
 temp_daily <- blrTemp %>%
@@ -239,7 +338,7 @@ temp_daily <- blrTemp %>%
   summarise(High = max(Temp), Low = min(Temp), .by = DT) %>%
   mutate(Month = month(DT), Day = day(DT))
 
-rain_daily <- blrRain %>%
+rain_daily <- rain_for_chart %>%
   mutate(DT = as.Date(DT), Rain = as.numeric(Rain)) %>%
   filter(DT < Sys.Date()) %>%
   summarise(Rain = sum(Rain), .by = DT) %>%
@@ -779,7 +878,7 @@ commentary <- {
 
 
 temp_data <- build_temperature_plot_data(blrTemp, curr_year)
-rain_data <- build_rain_plot_data(blrRain, curr_year)
+rain_data <- build_rain_plot_data(rain_for_chart, curr_year)
 
 combined <- render_weather_chart(
   temp_data = temp_data,
@@ -836,7 +935,11 @@ latest_payload <- list(
   chart_date_text = chart_date_text,
   recent_window_days = recent_window,
   insights = commentary_lines,
-  image = latest_web_path,
+  image = paste0(
+    latest_web_path,
+    "?revision=",
+    unname(tools::md5sum(latest_file))
+  ),
   archive_image = archive_web_path,
   source = "Oikolab",
   repository = "https://github.com/skthewimp/bangalore-weather"
@@ -1096,14 +1199,18 @@ publish_completed_year_archive <- function() {
 
   dir.create(public_analysis_dir, recursive = TRUE, showWarnings = FALSE)
   if (!file.exists(annual_chart) || !file.exists(public_annual_chart)) {
-    generate_weather_chart(completed_year, save_path = annual_chart)
+    generate_weather_chart(
+      completed_year,
+      save_path = annual_chart,
+      rain_override = rain_for_chart
+    )
   }
   file.copy(annual_chart, public_annual_chart, overwrite = TRUE)
 
   archive_entry <- list(
     year = completed_year,
     href = file.path("assets", "analysis", annual_chart_name),
-    summary = archive_summary_from_stats(compute_weather_stats(blrTemp, blrRain, completed_year))
+    summary = archive_summary_from_stats(compute_weather_stats(blrTemp, rain_for_chart, completed_year))
   )
 
   archive_entries <- c(list(archive_entry), archive_entries) %>%

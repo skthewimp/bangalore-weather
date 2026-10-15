@@ -1,5 +1,17 @@
 {
+  "bangalore-rain-variation-2026": {
+    "subtitle": "Daily rainfall from 28 WeatherUnion stations shows a Bangalore whose wettest and driest parts can be hundreds of millimetres apart."
+  },
   "september-rain-intensity": {
     "subtitle": "September has fewer rainy days than July and August, but they are a little heavier. May’s rainy days are heavier still."
+  },
+  "bangalore-second-summer": {
+    "subtitle": "September brings a recurring afternoon-heat rebound, especially in dry years, but the nights keep it from becoming a true second summer."
+  },
+  "september-rain-heat-lag": {
+    "subtitle": "Recent rain is linked with cooler September afternoons but warmer nights. The effect is modest, but the two directions are the interesting part."
+  },
+  "september-evening-temperature": {
+    "subtitle": "Through September 23, Bangalore's evening temperatures are unusually high, with the September opening especially far above its historical comparison."
   }
 }

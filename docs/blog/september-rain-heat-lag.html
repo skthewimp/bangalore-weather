@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rain cools Bangalore's September afternoons, but warms the nights - Bangalore Weather</title>
+<meta name="description" content="Recent rain is associated with cooler September afternoons and slightly warmer September nights in Bangalore. The effect is modest, but it runs in opposite directions.">
+<link rel="canonical" href="https://weather.karthiks.co/blog/september-rain-heat-lag.html">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="alternate" type="application/rss+xml" title="Bangalore Weather blog" href="feed.xml">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Rain cools Bangalore's September afternoons, but warms the nights">
+<meta property="og:description" content="Recent rain is associated with cooler September afternoons and slightly warmer September nights. The effect is modest, but it runs in opposite directions.">
+<meta property="og:image" content="https://weather.karthiks.co/assets/analysis/september-rain-heat-lag.png">
+<style>
+:root { --paper:#fffdf8; --ink:#3C3C3C; --muted:#666; --line:#cfc6b4; --teal:#005566; --weather-bg:#e5e1d8; --plum:#5f3946; }
+* { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--paper); font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; line-height:1.62; }
+a { color:var(--teal); text-decoration-thickness:1px; text-underline-offset:3px; } img { display:block; max-width:100%; height:auto; }
+.nav, article, footer { width:min(860px, calc(100vw - 32px)); margin:0 auto; }
+.nav { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:18px; border-bottom:1px solid var(--line); }
+.brand { color:var(--ink); font-weight:800; text-decoration:none; } .nav-links { display:flex; gap:16px; flex-wrap:wrap; font-size:.92rem; } .nav-links a { color:var(--ink); text-decoration:none; }
+header { background:var(--weather-bg); border-bottom:1px solid var(--line); } .hero { width:min(860px, calc(100vw - 32px)); margin:0 auto; padding:42px 0 34px; }
+.kicker { margin:0 0 10px; color:var(--plum); font-weight:800; font-size:.82rem; letter-spacing:.08em; text-transform:uppercase; }
+h1 { margin:0; font-size:clamp(2rem,4.8vw,3.5rem); line-height:1.08; } .lede { max-width:760px; margin:16px 0 0; font-size:1.08rem; }
+article { padding:34px 0 54px; } p { margin:0 0 18px; } figure { margin:28px 0; } figure img { border:1px solid var(--line); background:white; } figcaption { margin-top:8px; color:var(--muted); font-size:.9rem; }
+.ai-disclosure { margin:0 0 22px; padding:10px 12px; border-top:2px solid var(--line); border-bottom:1px solid var(--line); color:var(--muted); font-size:.92rem; }
+.original-question { margin-top:34px; padding-top:18px; border-top:1px solid var(--line); } .original-question h2 { font-size:1.15rem; }
+footer { padding:24px 0 36px; border-top:1px solid var(--line); color:var(--muted); font-size:.92rem; } @media (max-width:720px){ .nav{align-items:flex-start; flex-direction:column; padding:14px 0;} }
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Main navigation"><a class="brand" href="../">Bangalore Weather</a><div class="nav-links"><a href="../#today">Today</a><a href="./">Blog</a><a href="feed.xml">RSS</a><a href="../#archive">Years</a><a href="../#data">Data</a><a href="https://karthiks.co/">Karthik</a></div></nav>
+<header><div class="hero"><p class="kicker">Analysis</p><h1>Rain cools Bangalore's September afternoons, but warms the nights</h1><p class="lede">The actual temperatures are fairly steady. The interesting part is that recent rain points in opposite directions for daytime highs and nighttime lows.</p></div></header>
+<article>
+  <p class="ai-disclosure">This post is AI-written.</p>
+  <p>I started with a slightly vague September question: this year feels hot and dry, but does rain actually have anything to do with the temperature? The obvious first answer was to make a chart of temperature anomalies against recent rainfall.</p>
+  <p>That chart was technically sensible and visually annoying. September temperatures do not swing wildly from day to day, so plotting small departures from normal made the figure look like a collection of faint wiggles. It was asking the reader to care about the transformation before showing them the weather.</p>
+  <p>So I changed the chart. It now shows the actual daily maximum and minimum temperatures in Bangalore, with the amount of rain accumulated in the preceding seven days on the horizontal axis. The historical dots are all complete September days from 1981 through 2025. The red dots are September 1–11, 2026.</p>
+  <figure><img src="../assets/analysis/september-rain-heat-lag.png" width="2070" height="1530" alt="Two-panel scatter plot showing actual Bangalore September daytime highs and nighttime lows against rain accumulated in the preceding seven days."><figcaption>The chart uses actual temperatures. The statistical comparison underneath adjusts for the small difference between, say, September 3 and September 25.</figcaption></figure>
+  <p>The result is more interesting than the original “rain cools heat” story.</p>
+  <p>Recent rain is associated with <strong>cooler September afternoons</strong>. The relationship is modest, but it is consistent: the more rain in the preceding week, the lower the daily maximum tends to be. The seven-day relationship has a correlation of about -0.23, and an additional 10 mm of recent rain is associated with roughly 0.12°C less in the daytime maximum. Rain explains only about 5% of the day-to-day variation, so this is not a temperature forecast hiding inside a scatter plot. It is a small shift in the background conditions.</p>
+  <p>Then the second panel does something slightly unexpected. Recent rain is associated with <strong>warmer nights</strong>. This is the opposite direction from the afternoon result. More cloud and moisture can stop the night from radiating away as much heat, even while the same rainy spell is suppressing the afternoon high.</p>
+  <p>That is the part worth keeping. “Rain cools Bangalore” is not wrong, but it is incomplete. Rain seems to shave some heat off the afternoon while also making the night a little less cool. The daily temperature range gets squeezed from both ends.</p>
+  <p>The 2026 points fit the broader description of a hot and dry start to the month. Through September 11, the mean maximum temperature was 30.8°C, against 27.5°C for the same dates in earlier years. Mean daily rain was only 0.17 mm, compared with 3.89 mm historically. There had not yet been a single day with more than 1 mm of rain.</p>
+  <p>There is a small methodological wrinkle here. I used temperature anomalies, relative to the historical average for each calendar day, for the correlations. Otherwise the analysis could mistake the ordinary movement through September for a rain effect. But I did not make the reader look at those anomalies in the main chart. The chart shows the thing people actually experience: the high reached during the day and the low reached at night.</p>
+  <p>This still does not prove that rain causes the temperature change. Cloud cover, wind, humidity and larger weather systems are all mixed up with rainfall. A rainy spell is not a random experiment. The seven-day window is also not sacred; the sign is similar for same-day rain and for the one- and three-day windows, but the effect remains small.</p>
+  <p>Still, it changes how I would describe the September weather. Not “rain cools the city”, and not simply “this is a hot, dry month”. More like: <strong>recent rain tends to cool the afternoons while making the nights warmer.</strong> That is a much better story, and the actual temperatures make it easier to see.</p>
+  <section class="original-question"><h2>Original question</h2><p>Can we analyse the relationship between rain and heat in September using past years’ data ? Like this year has been hot and dry. <br><br>We need to oook at temperature in September as a finction of rain in the last few days or something. Wonder if some signal exists.</p></section>
+</article>
+<footer><a href="./">Back to blog</a> / <a href="https://karthiks.co/">Karthik Shashidhar</a></footer>
+</body>
+</html>

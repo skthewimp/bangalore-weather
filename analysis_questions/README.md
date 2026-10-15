@@ -8,6 +8,17 @@ questions asked in chat. A quick inline answer is fine only when the user explic
 asks for one. Otherwise, create the notebook, run the checks, and make the
 publish/no-publish decision in the repo.
 
+## Data source selection
+
+Before preparing an answer, read [data_sources.md](data_sources.md). Use WeatherUnion
+for locality observations and Oikolab/ERA5 for long-term history; use both separately
+when needed. Check freshness and measurement coverage for the requested period.
+The same rules apply to explicitly requested quick inline answers.
+
+The starter notebook is Oikolab-specific. Replace its loading, data preparation,
+and example analysis/chart blocks when using WeatherUnion; keep the notebook
+metadata, checks, verdict, and draft/publish workflow.
+
 ## Skill Use
 
 When available, use these skills as part of the workflow:
@@ -69,7 +80,7 @@ publish only the named completed analysis:
    - `slug`
    - `date`
    - `analyst`
-3. Run the notebook. It should load the local `.RData` files, build a tidy analysis
+3. Run the notebook. It should query the selected local archive (see `data_sources.md`), build a tidy analysis
    table, make at least one chart if the answer is visual, and write public charts to
    `docs/assets/analysis/`.
 4. Decide whether the result is worth keeping around. Be strict.

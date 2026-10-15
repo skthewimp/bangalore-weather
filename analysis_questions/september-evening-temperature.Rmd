@@ -1,0 +1,194 @@
+---
+title: "Bangalore's September evenings are unusually warm"
+question: "Track the average 7pm temperature through the years and see how this years has been different. Especially September - feels much  hotter in the evening"
+trigger_prompt: "Track the average 7pm temperature through the years and see how this years has been different. Especially September - feels much  hotter in the evening"
+slug: "september-evening-temperature"
+date: "2026-09-13"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 12, fig.height = 7, dpi = 150)
+library(tidyverse)
+library(lubridate)
+library(scales)
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+
+theme_weather <- function(base_size = 11) {
+  theme_minimal(base_size = base_size, base_family = "Helvetica") +
+    theme(plot.background = element_rect(fill = "white", color = NA),
+          panel.background = element_rect(fill = "white", color = NA),
+          panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_blank(),
+          panel.grid.major.y = element_line(color = "grey88", linewidth = 0.3),
+          axis.title = element_blank(),
+          axis.text = element_text(color = "#3C3C3C"),
+          plot.title = element_text(color = "#3C3C3C", face = "bold"),
+          plot.subtitle = element_text(color = "#666666"),
+          plot.caption = element_text(color = "#666666", size = rel(0.82)),
+          strip.text = element_text(color = "#3C3C3C", face = "bold"),
+          strip.background = element_rect(fill = "grey95", color = NA),
+          legend.position = "none")
+}
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## Analysis contract
+
+- **Unit:** one day with a valid ERA5 temperature reading at 19:00 local time (the archive timestamp is 19:30 IST).
+- **Metric:** mean temperature at that evening observation, in °C.
+- **Primary comparison:** 2026 against the same January 1–September 23 calendar window in every previous year. The current archive has complete 19:00 observations only through September 23.
+- **September comparison:** September 1–23 in 2026 against September 1–23 in prior years, so the incomplete current month is not compared with complete Septembers.
+- **Source:** ERA5 rows only. GFS rows are excluded.
+- **What this cannot show:** a causal explanation for the warmth. It can establish that this year's evenings have been warmer than the historical comparison window.
+
+## Data preparation and coverage
+
+```{r data-prep}
+load(file.path(root_dir, "data", "bangaloreTemperature.RData"))
+
+temp_7pm <- as.data.frame(blrTemp) %>%
+  filter(Source == "era5") %>%
+  transmute(
+    DT = as.POSIXct(DT, tz = "Asia/Kolkata"),
+    date = as.Date(DT),
+    year = year(DT),
+    month = month(DT),
+    day = day(DT),
+    hour = hour(DT),
+    temp_c = as.numeric(Temp)
+  ) %>%
+  filter(hour == 19, is.finite(temp_c)) %>%
+  group_by(date, year, month, day) %>%
+  summarise(temp_c = mean(temp_c), .groups = "drop")
+
+last_current_date <- max(temp_7pm$date[temp_7pm$year == 2026])
+cutoff_yday <- yday(last_current_date)
+cutoff_month_day <- day(last_current_date)
+cutoff_key <- month(last_current_date) * 100 + day(last_current_date)
+
+coverage <- temp_7pm %>%
+  summarise(first_date = min(date), last_date = max(date),
+            observations = n(), years = n_distinct(year))
+coverage
+```
+
+The ERA5 archive has `r comma(coverage$observations)` daily evening observations from `r format(coverage$first_date, "%d %B %Y")` through `r format(coverage$last_date, "%d %B %Y")`. For a fair 2026 comparison, I use the same calendar-date cutoff in every year.
+
+## First, the whole year so far
+
+```{r ytd-summary}
+ytd <- temp_7pm %>%
+  mutate(date_key = month(date) * 100 + day(date)) %>%
+  filter(date_key <= cutoff_key) %>%
+  group_by(year) %>%
+  summarise(observations = n(), mean_7pm = mean(temp_c), .groups = "drop") %>%
+  mutate(rank = min_rank(desc(mean_7pm)))
+
+current_ytd <- ytd %>% filter(year == 2026)
+historical_ytd <- ytd %>% filter(year < 2026)
+
+ytd %>% arrange(desc(mean_7pm)) %>% slice_head(n = 10)
+```
+
+Through `r format(last_current_date, "%d %B")`, 2026's average evening temperature was `r round(current_ytd$mean_7pm, 1)`°C. That puts it `r current_ytd$rank`th out of `r nrow(ytd)` years, behind `r paste((ytd %>% filter(year < 2026) %>% arrange(desc(mean_7pm)) %>% slice_head(n = current_ytd$rank - 1) %>% pull(year)), collapse = ", ")`. The historical mean for the same period is `r round(mean(historical_ytd$mean_7pm), 1)`°C, so 2026 is `r round(current_ytd$mean_7pm - mean(historical_ytd$mean_7pm), 1)`°C warmer at 7pm.
+
+## September is the sharper result
+
+```{r september-summary}
+september <- temp_7pm %>%
+  filter(month == 9, day <= cutoff_month_day) %>%
+  group_by(year) %>%
+  summarise(observations = n(), mean_7pm = mean(temp_c), .groups = "drop") %>%
+  mutate(rank = min_rank(desc(mean_7pm)))
+
+current_september <- september %>% filter(year == 2026)
+historical_september <- september %>% filter(year < 2026)
+
+september %>% arrange(desc(mean_7pm)) %>% slice_head(n = 10)
+```
+
+September 2026 is much more unusual. The first `r cutoff_month_day` evenings averaged `r round(current_september$mean_7pm, 1)`°C at 7pm, against a historical mean of `r round(mean(historical_september$mean_7pm), 1)`°C. That is a difference of `r round(current_september$mean_7pm - mean(historical_september$mean_7pm), 1)`°C, and it is the hottest September 1–`r cutoff_month_day` in the archive. The previous high was `r round(max(historical_september$mean_7pm), 1)`°C.
+
+The daily September readings were `r paste(round(temp_7pm %>% filter(year == 2026, month == 9) %>% arrange(date) %>% pull(temp_c), 1), collapse = ", ")`°C. That is not one freak evening carrying the result. Every available evening was above the historical September 1–`r cutoff_month_day` average.
+
+## Chart
+
+```{r chart}
+ytd_plot <- ytd %>% transmute(year, mean_7pm, panel = paste0("January–September ", cutoff_month_day))
+sep_plot <- september %>% transmute(year, mean_7pm, panel = paste0("September 1–", cutoff_month_day))
+plot_data <- bind_rows(ytd_plot, sep_plot) %>%
+  mutate(panel = factor(panel, levels = c(paste0("January–September ", cutoff_month_day), paste0("September 1–", cutoff_month_day))),
+         current = year == 2026)
+
+reference_lines <- bind_rows(
+  tibble(panel = factor(paste0("January–September ", cutoff_month_day), levels = levels(plot_data$panel)),
+         reference = mean(historical_ytd$mean_7pm)),
+  tibble(panel = factor(paste0("September 1–", cutoff_month_day), levels = levels(plot_data$panel)),
+         reference = mean(historical_september$mean_7pm))
+)
+
+labels <- plot_data %>% filter(current) %>%
+  mutate(label = paste0(round(mean_7pm, 1), "°C"))
+
+chart_path <- file.path(chart_dir, "september-evening-temperature.png")
+p <- ggplot(plot_data, aes(year, mean_7pm)) +
+  geom_hline(data = reference_lines, aes(yintercept = reference),
+             color = "grey55", linewidth = 0.45, linetype = "dashed") +
+  geom_line(color = "#8C9799", linewidth = 0.65) +
+  geom_smooth(aes(group = 1), method = "lm", formula = y ~ x,
+              se = FALSE, color = "#3C3C3C", linewidth = 0.8,
+              linetype = "dotdash") +
+  geom_point(aes(color = current), size = 1.8) +
+  geom_text(data = labels, aes(label = label),
+            nudge_x = 0.8, hjust = 0, color = "#B94732", fontface = "bold", size = 3.4) +
+  scale_color_manual(values = c(`FALSE` = "#8C9799", `TRUE` = "#C4513A")) +
+  facet_grid(panel ~ ., scales = "free_y", switch = "y") +
+  scale_x_continuous(breaks = seq(1985, 2025, 5),
+                     limits = c(1980, 2028), expand = expansion(mult = c(0.01, 0.02))) +
+  scale_y_continuous(labels = label_number(accuracy = 0.1, suffix = "°C"),
+                     expand = expansion(mult = c(0.08, 0.16))) +
+  labs(title = "Bangalore's evening temperature has been unusually high in September",
+       subtitle = "Average temperature at the 19:00 ERA5 observation (approximately 19:30 IST), compared over matching dates",
+       y = "Average 7pm temperature (°C)",
+       caption = paste0("Red: 2026. Dashed line: 1981–2025 mean for the same dates. Archive available through ", format(last_current_date, "%d %B %Y"), "; 19:00 means the archive's 19:30 IST observation.")) +
+  theme_weather() +
+  theme(axis.text.x = element_text(angle = 0),
+        axis.title = element_text(color = "#3C3C3C", face = "bold"),
+        plot.margin = margin(10, 75, 10, 10))
+p
+ggsave(chart_path, p, width = 12, height = 7, dpi = 180, bg = "white")
+```
+
+## Checks and interpretation
+
+- The comparison uses the same January 1–September 23 calendar window in every year, avoiding the mistake of comparing an incomplete 2026 year with complete years.
+- September uses September 1–23 in every year, not a full September for the historical baseline.
+- The 2026 ERA5 data currently ends on September 23, even though the calendar month has continued. This result should be rerun when later archive rows become available.
+- The archive timestamp labelled 19:00 in this analysis is the 19:30 IST observation. It is a consistent evening measure, but not a literal instantaneous 19:00 reading.
+- This establishes an unusually warm evening pattern, not why it happened. Cloud cover, humidity, wind and rainfall are possible contributors, but they need a separate analysis.
+
+## Verdict
+
+Insightful: yes
+
+The feeling is supported by the archive, especially in September. Through September `r cutoff_month_day`, 2026's average evening temperature was `r round(current_ytd$mean_7pm, 1)`°C, the `r current_ytd$rank`th-highest matching-period value in 46 years. September 1–`r cutoff_month_day` was the clearest result: `r round(current_september$mean_7pm, 1)`°C against a historical `r round(mean(historical_september$mean_7pm), 1)`°C, making it the warmest comparable opening of September in the archive. This is a strong enough descriptive result to keep, while the incomplete current month and ERA5 timestamp caveats should remain visible.
+
+Charts:
+
+- `docs/assets/analysis/september-evening-temperature.png`
+
+Blog post:
+
+- not published; await explicit `/weather_publish september-evening-temperature`

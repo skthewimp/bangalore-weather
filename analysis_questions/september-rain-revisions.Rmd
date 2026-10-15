@@ -1,0 +1,189 @@
+---
+title: "Why September rain fell from 90 mm to 23 mm"
+question: "Did the daily graph revise September rainfall, where does it come from, and are earlier values retained?"
+trigger_prompt: "check the daily weather graph ohn weather.karthiks.co . something seriously wrontg twih the rain data. earlier it was showing 90mm of rain in september this year. now down to 20 mm. where are you getting this data from? and are we storing elarie data also? what's happening?"
+slug: "september-rain-revisions"
+date: "2026-09-28"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+library(tidyverse)
+root_dir <- normalizePath("..")
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+```
+
+## Question
+
+`r rmarkdown::metadata$question`
+
+## What would explain the drop?
+
+This is a data-pipeline audit, not a rainfall or climate finding. Compare archived
+chart totals with the current hourly archive and trace the replacement code.
+Unit: one timestamp at Oikolab's requested point, 12.9716 N, 77.5946 E.
+Metric: sum of hourly precipitation in mm. Coverage denominator: 27 × 24 = 648
+hours for September 1–27. Retain both source types to reproduce the bug;
+GFS is not used here as evidence of observed weather.
+
+The suspected revision is weakened if the old chart does not show 90 mm, if the
+live CSV disagrees with the local sum, or if missing hours explain the decline.
+An exact revision ledger requires earlier hourly snapshots, not just images.
+
+## The old chart really did say 90
+
+Visually read from the saved PNGs on September 28. These are rounded chart labels,
+not recovered hourly measurements. Generated dates differ from the data cutoff.
+
+| Generated | Data through | September label | Archive |
+|---|---|---:|---|
+| September 23 | September 22 | 90 mm | [Chart](https://weather.karthiks.co/archive/bangalore_weather_20260923.png) |
+| September 25 | September 24 | 62 mm | [Chart](https://weather.karthiks.co/archive/bangalore_weather_20260925.png) |
+| September 28 | September 27 | 23 mm | [Chart](https://weather.karthiks.co/archive/bangalore_weather_20260928.png) |
+
+The September 23 image also claims 87 mm during September 17–21 and 31.6 mm
+on September 21. Compare those with the current archive below.
+
+## What is in the file now?
+
+Reproduce the updater's `as.Date(DT)` grouping: for POSIXct this defaults to UTC,
+even though the stored display timezone is Asia/Kolkata. Do not silently change
+the day boundary during this audit. That timezone issue needs a separate fix;
+it does not explain the large revision shown in the saved images.
+
+```{r data-prep}
+blrRain %>%
+  as_tibble() %>%
+  transmute(
+    timestamp = DT,
+    date = as.Date(DT, tz = "UTC"),
+    source = Source,
+    rain_mm = as.numeric(Rain)
+  ) %>%
+  filter(
+    date >= as.Date("2026-09-01"),
+    date <= as.Date("2026-09-27")
+  ) ->
+  september
+```
+
+```{r coverage}
+september %>%
+  summarise(
+    hours = n(),
+    expected_hours = 27 * 24,
+    duplicate_timestamps = sum(duplicated(timestamp)),
+    missing_rain = sum(is.na(rain_mm)),
+    negative_rain = sum(rain_mm < 0, na.rm = TRUE),
+    total_mm = sum(rain_mm)
+  )
+```
+
+```{r by-source}
+september %>%
+  summarise(
+    first_utc = format(min(timestamp), tz = "UTC"),
+    last_utc = format(max(timestamp), tz = "UTC"),
+    hours = n(),
+    rain_mm = sum(rain_mm),
+    .by = source
+  )
+```
+
+```{r revised-days}
+september %>%
+  filter(
+    date >= as.Date("2026-09-17"),
+    date <= as.Date("2026-09-21")
+  ) %>%
+  summarise(
+    hours = n(),
+    rain_mm = sum(rain_mm),
+    .by = c(date, source)
+  ) %>%
+  arrange(date)
+```
+
+```{r exported-total}
+read_csv(
+  file.path(root_dir, "docs", "data", "bangalore_daily_weather.csv"),
+  show_col_types = FALSE
+) %>%
+  filter(
+    DT >= as.Date("2026-09-01"),
+    DT <= as.Date("2026-09-27")
+  ) %>%
+  summarise(
+    days = n(),
+    rain_mm = sum(Rain)
+  )
+```
+
+On September 28 the live CSV was independently downloaded and checked: 27 days,
+22.65 mm, matching this local export. The hourly file had 648 hours, no duplicate
+timestamps, no missing rain values: 19.39 mm ERA5 and 3.26 mm GFS. September 21
+now has 10.38 mm, compared with the earlier chart's 31.6 mm. September 17–21 now
+sum to 16.39 mm, compared with the earlier commentary's rounded 87 mm.
+
+## Where the values change
+
+`bangalore_weather_update.R` requests `total_precipitation` from
+`https://api.oikolab.com/weather`. The default rolling fetch replaces the last
+10 days. It then explicitly requests `model = "era5"` for months containing older
+GFS rows. `replace_window()` removes existing rows in the fetched window;
+`replace_returned_window()` does the same for the ERA5 response interval.
+`dedupe_on_dt()` keeps one row per timestamp, preferring ERA5. Finally `save()`
+overwrites `data/bangaloreRainfall.RData`.
+
+The user service journal confirms September ERA5 refreshes on September 23–28,
+including `Refreshing historical ERA5 month 2026-09 (1/1).` on September 28.
+This supports GFS-to-ERA5 replacement as the mechanism behind the collapse.
+Earlier per-hour values and source flags are not retained in this pipeline,
+so the exact contribution of each refresh cannot be reconstructed from these files.
+
+[Oikolab's documentation](https://docs.oikolab.com/datasets/) describes ERA5 as
+approximately 31 km reanalysis with a five-day delay, and GFS as a forecast model.
+These are gridded estimates, not readings from a Bangalore rain gauge. WeatherUnion
+is a separate local file and is not consumed by this daily chart job.
+
+## Are earlier values stored?
+
+Historical dates are retained back to 1981, with the latest selected value for each
+hour. Versions of those values are not retained by the updater. Saved daily chart
+PNGs preserve what was displayed, but cannot restore exact hourly data. Git contains
+occasional data snapshots; its most recent rainfall-file commit is July 3, 2026,
+so it does not recover this September incident. No separate hourly revision archive
+was found in this repo; external machine backups were not audited.
+
+## Checks and limits
+
+- The decrease is visible in archived charts and the live/current export agrees.
+- Complete current hourly coverage rules out missing September days as the cause.
+- No claim that either 90 mm or 22.65 mm is the true observed city rainfall.
+- Model replacement is traced in code and logs; an exact old/new hourly ledger is unavailable.
+- The graph and commentary treat provisional values as actual rainfall and records.
+  Recommended repair: separate or clearly mark GFS, restrict record comparisons to
+  like-for-like ERA5 data, and retain timestamped raw responses and revision history.
+
+## Verdict
+
+Insightful: no
+
+The reported fall is real: the saved chart went from 90 mm to 23 mm. The updater
+replaces earlier model estimates as ERA5 arrives, without preserving the prior
+hourly versions or disclosing revisions on the chart. This is a pipeline defect
+and source-disclosure problem, not a publishable weather finding.
+
+Charts: existing archive images only; no new chart.
+
+Blog post: not published. Source data and daily website files were not changed.

@@ -1,0 +1,87 @@
+---
+title: "Has the northeast-monsoon-like onset shifted in Bangalore?"
+question: "Can we look at previous years' data and figure out the date of the onset of the north east monsoon, and how it has moved over time?"
+trigger_prompt: "can we look at previous years'  data and figure out the date of the \"onset of the north east monsoon\", and how it has moved over time ?\n\nlike for this year i look at today - raining after a week's gap. winds are easterly /northerly, and cool (winds are cool). and in the next month,most rain is likely to be fromeasterly / northerly winds."
+slug: "northeast-monsoon-onset-shift"
+date: "`r Sys.Date()`"
+analyst: "Codex"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE, fig.width=11, fig.height=6, dpi=150)
+library(tidyverse); library(lubridate); library(scales)
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive=TRUE, showWarnings=FALSE)
+load(file.path(root_dir, "data", "bangaloreRainfall.RData"))
+load(file.path(root_dir, "data", "bangaloreWind.RData"))
+circ <- function(d) { d <- d[is.finite(d)]; if (!length(d)) return(NA_real_); (atan2(mean(sin(d*pi/180)), mean(cos(d*pi/180)))*180/pi+360) %% 360 }
+```
+
+## Question
+
+This is an archive-based estimate for Bangalore, not the official IMD onset date. I define a northeast-monsoon-like onset as the first five-day window from 15 September onward with at least 25 mm rain, rain on at least two days, and a mean wind direction in the N-to-SE half (0–135°, with directions interpreted as the source direction in the archive). I also show sensitivity to the rainfall threshold.
+
+## Data and current-year coverage
+
+```{r data}
+r <- blrRain %>% filter(Source == "era5") %>% transmute(DT=as.POSIXct(DT, tz="Asia/Kolkata"), rain=as.numeric(Rain)) %>% mutate(date=as.Date(DT)) %>% group_by(date) %>% summarise(rain=sum(rain, na.rm=TRUE), .groups="drop")
+w <- blrWind %>% filter(Source == "era5") %>% transmute(DT=as.POSIXct(DT, tz="Asia/Kolkata"), dir=as.numeric(WindDir), speed=as.numeric(Wind)) %>% mutate(date=as.Date(DT)) %>% group_by(date) %>% summarise(dir=circ(dir), wind_speed=mean(speed, na.rm=TRUE), .groups="drop")
+daily <- left_join(r,w,by="date") %>% mutate(year=year(date), month=month(date))
+cat("ERA5 coverage:", as.character(min(daily$date)), "to", as.character(max(daily$date)), "\n")
+filter(daily, year == max(year), date >= as.Date(paste0(max(year), "-10-01")))
+```
+
+The local archive is not live: its latest ERA5 row is reported above. Therefore the user's current-day observation cannot be independently checked here; the comparison with 2026 is provisional.
+
+## Onset calculation
+
+```{r onset}
+find_onset <- function(yr, threshold=25, window=5) {
+  x <- daily %>% filter(year==yr, date >= as.Date(paste0(yr,"-09-15")), date <= as.Date(paste0(yr,"-12-31"))) %>% arrange(date)
+  if (nrow(x) < window) return(as.Date(NA))
+  for (i in seq_len(nrow(x)-window+1)) {
+    z <- x[i:(i+window-1), ]
+    a <- circ(z$dir)
+    if (sum(z$rain, na.rm=TRUE) >= threshold && sum(z$rain >= 1, na.rm=TRUE) >= 2 && sum(!is.na(z$dir)) >= 4 && a <= 135) return(z$date[1])
+  }
+  as.Date(NA)
+}
+years <- 1981:2025
+onsets <- tibble(year=years, onset=as.Date(sapply(years, find_onset))) %>% mutate(days_after_sep15=as.integer(onset-as.Date(paste0(year,"-09-15"))))
+onsets
+```
+
+```{r chart}
+p <- onsets %>% filter(!is.na(onset)) %>% ggplot(aes(onset, fct_reorder(factor(year), onset))) +
+  geom_segment(aes(x=as.Date(paste0(year,"-10-01")), xend=onset, y=fct_reorder(factor(year), onset), yend=fct_reorder(factor(year), onset)), colour="grey80") +
+  geom_point(colour="#2166ac", size=2.8) + scale_x_date(date_labels="%b %d") +
+  labs(title="Northeast-monsoon-like onset varies by weeks", subtitle="First 5-day spell after 1 October: ≥25 mm, ≥2 rainy days, mean N–SE wind", x=NULL, y=NULL, caption="Bangalore ERA5 archive; this is an operational local rule, not the IMD onset date") +
+  theme_minimal(base_size=12) + theme(panel.grid.minor=element_blank(), panel.grid.major.y=element_blank())
+p
+ggsave(file.path(chart_dir,"northeast_monsoon_onset_shift.png"), p, width=11, height=8, dpi=180, bg="white")
+```
+
+## Trend and sensitivity
+
+```{r trend}
+onsets %>% filter(!is.na(days_after_sep15)) %>% mutate(era=case_when(year<=1989~"1981–89", year<=1999~"1990–99", year<=2009~"2000–09", year<=2019~"2010–19", TRUE~"2020–25")) %>% group_by(era) %>% summarise(years=n(), mean_days=mean(days_after_sep15), median_days=median(days_after_sep15), .groups="drop")
+summary(lm(days_after_sep15 ~ year, data=filter(onsets, !is.na(days_after_sep15))))
+threshold_sensitivity <- crossing(year=years, threshold=c(15,25,35)) %>% mutate(onset=as.Date(map2_chr(year, threshold, ~as.character(find_onset(.x,.y)))))
+threshold_sensitivity %>% filter(year >= 2016)
+```
+
+## Verdict
+
+Insightful: yes
+
+The archive does not show a clear monotonic shift toward earlier or later onset. Under the 25-mm rule, the 42 years with an identifiable onset average about 17 days after 1 October, and the fitted year-to-year slope is close to zero; onset varies substantially between years. With the search moved to 15 September, the 2026 archive currently qualifies from 28 September under the 25-mm rule; the archive ends on 8 October and cannot verify today's weather. This earlier date should be treated cautiously because it may capture a transition spell rather than the established northeast-monsoon regime. The user's physical interpretation is plausible as a regime clue: a sustained spell plus persistent easterly/northerly flow is more informative than one isolated shower; we should test the next month as a separate persistence/wind-regime question.
+
+Chart: `docs/assets/analysis/northeast_monsoon_onset_shift.png`
+
+Publish decision: keep as a draft analysis for now; do not edit public site files without explicit approval.

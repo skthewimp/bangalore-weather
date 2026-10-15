@@ -27,3 +27,5 @@ docs/archive/bangalore_weather_????????.png
 # Pinned publishing runtime, credentials, drafts and private backups.
 .substack-runtime/
 .substack-state/
+publishing/drafts/
+__pycache__/

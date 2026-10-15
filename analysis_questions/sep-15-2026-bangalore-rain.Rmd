@@ -1,0 +1,91 @@
+# Bangalore's September 15 rain: where it arrived and how much fell
+
+- **Question:** Yesterday, there was fairly heavy rain in parts of Bangalore. Can we map how rain moved across WeatherUnion stations and show how much fell in different parts of town?
+- **Trigger prompt:** Yesterday, there was fairly heavy rain in parts of Bangalore. Now, can you map out maybe a line graph for each weather station from Weather Union or something like that, how the rain went in terms of where it started raining first, where it rained later? Another thing you could possibly do is on a map, show how much it rained in different parts of town and stuff. Also, another analysis to do related to this is what impact did the rain have on temperature in different parts of Bangalore?
+- **Date analysed:** 2026-09-15 (IST)
+- **Source:** WeatherUnion hourly archive snapshot, `data/weatherunion_bengaluru_hourly.parquet`, copied 2026-09-16.
+
+## Analysis contract
+
+- **Unit:** station-hour; station-day for the map and onset summary.
+- **Rain start:** first hourly `rain_mm > 0.1` after midnight IST. This is an hourly sensor-derived onset, not the exact minute rain began.
+- **Rain total:** sum of derived hourly `rain_mm`; a station total is reported only when all 24 hourly rain values are valid.
+- **Missingness:** Rainfall is available for all 31 stations in this day's snapshot.
+- **Spatial caveat:** points are station observations, not ward-wide estimates. No interpolation is used.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE, fig.width=12, fig.height=7, dpi=150)
+library(tidyverse)
+library(lubridate)
+library(arrow)
+library(sf)
+library(scales)
+library(grid)
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive=TRUE, showWarnings=FALSE)
+weatherunion <- open_dataset(file.path(root_dir,"data","weatherunion_bengaluru_hourly.parquet"))
+start_ist <- as.POSIXct("2026-09-15 00:00:00", tz="Asia/Kolkata")
+end_ist <- as.POSIXct("2026-09-16 00:00:00", tz="Asia/Kolkata")
+w <- weatherunion %>% filter(hour_ist >= start_ist, hour_ist < end_ist) %>% select(locality_id,current_locality_name,hour_ist,rain_mm,latitude,longitude,source_minutes) %>% collect() %>% arrange(locality_id,hour_ist)
+w <- w %>% group_by(locality_id) %>% mutate(hour=hour(hour_ist), rain_event=replace_na(rain_mm,0)>0.1) %>% ungroup()
+onsets <- w %>% filter(rain_event) %>% group_by(locality_id,current_locality_name) %>% summarise(first_rain_hour=min(hour), .groups="drop")
+daily <- w %>% group_by(locality_id,current_locality_name,latitude,longitude) %>% summarise(observed_hours=n(), valid_rain_hours=sum(!is.na(rain_mm)), rain_mm=sum(rain_mm,na.rm=TRUE), .groups="drop") %>% mutate(rain_mm=if_else(valid_rain_hours==24,rain_mm,NA_real_)) %>% left_join(onsets,by=c("locality_id","current_locality_name"))
+
+base_theme <- theme_minimal(base_size=10) + theme(plot.background=element_rect(fill="white",colour=NA), panel.background=element_rect(fill="white",colour=NA), panel.grid.minor=element_blank(), panel.grid.major.x=element_blank(), axis.text=element_text(colour="#3c3c3c"), strip.text=element_text(face="bold",colour="#3c3c3c"), plot.title=element_text(face="bold",colour="#3c3c3c"), plot.subtitle=element_text(colour="#666666"), plot.caption=element_text(colour="#666666",size=8))
+```
+
+## First, pulse check
+
+```{r facts}
+daily %>% arrange(desc(rain_mm)) %>% select(current_locality_name,rain_mm,first_rain_hour,valid_rain_hours) %>% print(n=40)
+
+```
+
+Across 31 stations, the rain totals are complete at the hourly level.
+
+## Where did the rain arrive first?
+
+```{r rain-lines}
+line_path <- file.path(chart_dir,"bangalore-sep-15-2026-rain-arrival.png")
+station_order <- daily %>% mutate(sort_total=replace_na(rain_mm,-Inf),first_rain_hour=replace_na(first_rain_hour,25L)) %>% arrange(desc(sort_total),first_rain_hour) %>% pull(current_locality_name)
+heat_data <- w %>% mutate(station=factor(current_locality_name,levels=rev(station_order)), rain_for_tile=replace_na(rain_mm,0))
+p1 <- ggplot(heat_data,aes(hour,station,fill=rain_for_tile)) + geom_tile(width=.96,height=.86) + geom_text(data=daily %>% mutate(station=factor(current_locality_name,levels=rev(station_order)),total_label=if_else(rain_mm>0,paste0(number(rain_mm,accuracy=.1)," mm"),"0.0 mm")),aes(x=24.35,y=station,label=total_label),inherit.aes=FALSE,hjust=0,size=2.7,colour="#3c3c3c") + scale_fill_gradient(low="#f3f7f8",high="#176b87",trans="sqrt",breaks=c(0,1,5,20,60),labels=label_number(suffix=" mm"),name="Hourly rain") + scale_x_continuous(breaks=c(0,6,12,18,23),limits=c(-.5,26),labels=function(x)ifelse(x<24,sprintf("%02d:00",x),"")) + labs(title="Rainfall by station - 15 September 2026",subtitle="Rows are ordered by total rainfall, highest first; darker cells mean more rain in that hour",x="Hour (IST)",y=NULL,caption="The first coloured cell in a row marks the first hourly window with >0.1 mm; totals at right. Station observations, not area-wide estimates.") + base_theme + theme(axis.text.y=element_text(size=8),panel.grid=element_blank(),plot.margin=margin(10,70,10,10))
+p1
+ggsave(line_path,p1,width=12,height=9,dpi=180,bg="white")
+```
+
+The rows are sorted by total rainfall, highest first. The chart still shows timing through the first coloured cell in each row, but it no longer implies that the stations are ordered as a sequence of storm movement. Because the archive is hourly, it cannot resolve which sensor received the first drops within a given hour.
+
+## How much fell where?
+
+```{r rain-map}
+map_path <- file.path(chart_dir,"bangalore-sep-15-2026-rain-map.png")
+stations <- st_read(file.path(root_dir,"data/maps/bangalore/bangalore_weather_maps.gpkg"),layer="weatherunion_stations",quiet=TRUE)
+roads <- st_read(file.path(root_dir,"data/maps/bangalore/bangalore_weather_maps.gpkg"),layer="osm_major_roads",quiet=TRUE)
+outline <- st_read(file.path(root_dir,"data/maps/bangalore/bangalore_weather_maps.gpkg"),layer="bbmp_legacy_outline",quiet=TRUE)
+rain_points <- stations %>% select(-current_locality_name, -latitude, -longitude) %>% left_join(daily,by="locality_id") %>% st_as_sf()
+p2 <- ggplot() + geom_sf(data=roads,colour="grey88",linewidth=.18) + geom_sf(data=outline,fill=NA,colour="grey65",linewidth=.3) + geom_sf(data=rain_points %>% filter(!is.na(rain_mm)),aes(colour=rain_mm),size=3.2) + geom_sf_text(data=rain_points %>% filter(!is.na(rain_mm) & rain_mm >= 30),aes(label=current_locality_name),size=2.8,nudge_y=.012,check_overlap=TRUE) + scale_colour_gradient(low="#cfe8f3",high="#b2182b",trans="sqrt",labels=label_number(suffix=" mm")) + labs(title="Rainfall was highly uneven across Bangalore",subtitle="24-hour station totals for 15 September 2026; colour scale uses square-root spacing",colour="Rain",caption="WeatherUnion stations. Roads: © OpenStreetMap contributors. Boundary: legacy BBMP reference / DataMeet; not a current ward map.") + coord_sf(expand=FALSE) + base_theme + theme(axis.title=element_blank(),axis.text=element_blank(),axis.ticks=element_blank(),panel.grid=element_blank(),legend.position="right")
+p2
+ggsave(map_path,p2,width=10,height=8,dpi=180,bg="white")
+```
+
+This map shows measured station points, not a continuous rainfall surface. Rajajinagar, MG Road, New BEL Road and HSR Layout were among the wettest stations; the exact ranking is in the facts table above.
+
+## Verdict
+
+- All 31 stations in the September 15 window have 24 observed and valid hourly rainfall values.
+- Rain is derived from changes in reported accumulation; it is not a direct minute-level gauge total.
+- The map does not interpolate between sensors or sum station values into a city total.
+
+Insightful: yes
+
+This is exploratory only. The station-by-station view can show that this was a spatially uneven event with different onset hours, while the map makes the uneven totals immediately visible. Do not treat the two days as evidence of permanent Bangalore rainfall zones; a multi-event follow-up is needed.
+
+**Charts:**
+
+- `docs/assets/analysis/bangalore-sep-15-2026-rain-arrival.png`
+- `docs/assets/analysis/bangalore-sep-15-2026-rain-map.png`
+
+
+**Blog post:** not published; this is a draft analysis from the chat workflow.

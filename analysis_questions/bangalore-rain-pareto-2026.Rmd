@@ -1,0 +1,162 @@
+---
+title: "Bangalore's rain arrived in bursts, not evenly across days"
+question: "For daily rain across all available Bangalore areas, what share of rainy-season rainfall came from the wettest share of days?"
+trigger_prompt: >-
+  [Replying to: "Created the Substack draft: Bangalore’s monsoon was not one rainfall season https://bangaloreweather.substack.com/publish/post/218515767 The draft includes the reviewed subtitle, article text, and heatmap image. It remains unpublished for your manual review."] continuing this analysis, do "pareto curves" for daily rain for all areas of bangalore. sort in descending order of daily rain. look at what % of days result in what % of rains. stright line means uniform, etc.
+author: "Codex"
+date: "2026-10-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(arrow)
+library(lubridate)
+library(scales)
+root_dir <- normalizePath(file.path(dirname(knitr::current_input()), ".."))
+chart_dir <- file.path(root_dir, "docs", "assets", "analysis")
+dir.create(chart_dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## The question
+
+The heatmap showed *where* rain fell. This follow-up asks a different question: was each locality's seasonal rain spread fairly evenly across days, or did a small number of wet days account for most of its total?
+
+The unit is a complete locality-day from the WeatherUnion hourly archive. For each station, daily values are sorted from wettest to driest, then converted to two cumulative percentages:
+
+- x = the share of complete days included, in descending daily-rain order;
+- y = the share of that locality's total rain accumulated by those days.
+
+A straight diagonal would mean rainfall was uniform across days. Curves above it mean concentration: the first few wettest days account for more than their proportional share of seasonal rain. Dry days remain in the denominator, so this is a daily-rain distribution, not only a rainy-day intensity curve.
+
+## Coverage first
+
+```{r coverage}
+archive <- open_dataset(file.path(root_dir, "data", "weatherunion_bengaluru_hourly.parquet"))
+hourly <- archive %>%
+  filter(
+    hour_ist >= as.POSIXct("2026-05-01 00:00:00", tz = "Asia/Kolkata"),
+    hour_ist < as.POSIXct("2026-10-01 00:00:00", tz = "Asia/Kolkata")
+  ) %>%
+  select(locality_id, current_locality_name, hour_ist, rain_mm) %>% collect() %>%
+  mutate(date = as.Date(hour_ist, tz = "Asia/Kolkata"))
+
+stopifnot(!anyDuplicated(hourly[c("locality_id", "hour_ist")]))
+stopifnot(all(hourly$rain_mm >= 0 | is.na(hourly$rain_mm)))
+
+daily_raw <- hourly %>%
+  group_by(locality_id, current_locality_name, date) %>%
+  summarise(
+    observed_hours = n(),
+    valid_rain_hours = sum(!is.na(rain_mm)),
+    rain_mm = sum(rain_mm, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(rain_mm = if_else(valid_rain_hours == 24, rain_mm, NA_real_))
+
+coverage <- daily_raw %>%
+  summarise(
+    complete_days = sum(!is.na(rain_mm)),
+    first_day = min(date), last_day = max(date), .by = c(locality_id, current_locality_name)
+  ) %>% arrange(desc(complete_days), current_locality_name)
+
+coverage
+```
+
+The main comparison retains the 28 stations with at least 120 complete days, matching the previous heatmap. Three shorter/incomplete records remain visible in the coverage table but are not ranked as if they represented the full May-September window.
+
+## Pareto curves
+
+```{r pareto}
+selected <- coverage %>% filter(complete_days >= 120) %>% pull(current_locality_name)
+
+pareto <- daily_raw %>%
+  filter(current_locality_name %in% selected, !is.na(rain_mm)) %>%
+  group_by(current_locality_name) %>%
+  arrange(desc(rain_mm), date, .by_group = TRUE) %>%
+  mutate(
+    day_share = row_number() / n() * 100,
+    rain_share = cumsum(rain_mm) / sum(rain_mm) * 100,
+    seasonal_rain_mm = sum(rain_mm),
+    rainy_days = sum(rain_mm > 0),
+    n_days = n()
+  ) %>% ungroup()
+
+facts <- pareto %>%
+  group_by(current_locality_name, seasonal_rain_mm, rainy_days, n_days) %>%
+  summarise(
+    rain_top_1pct = approx(day_share, rain_share, xout = 1, rule = 2)$y,
+    rain_top_5pct = approx(day_share, rain_share, xout = 5, rule = 2)$y,
+    rain_top_10pct = approx(day_share, rain_share, xout = 10, rule = 2)$y,
+    rain_top_20pct = approx(day_share, rain_share, xout = 20, rule = 2)$y,
+    .groups = "drop"
+  ) %>% arrange(desc(rain_top_10pct))
+facts
+
+# Label the wettest, driest and median-concentration curves; all curves remain drawn.
+label_names <- facts %>%
+  mutate(rank_concentration = rank(rain_top_10pct, ties.method = "first")) %>%
+  filter(current_locality_name %in% c(
+    facts$current_locality_name[1],
+    facts$current_locality_name[nrow(facts)],
+    facts$current_locality_name[ceiling(nrow(facts) / 2)]
+  )) %>% pull(current_locality_name)
+
+plot_lines <- pareto %>% mutate(
+  curve = if_else(current_locality_name %in% label_names, current_locality_name, "Other localities")
+)
+
+pareto_path <- file.path(chart_dir, "bangalore-rain-variation-2026-pareto-curves.png")
+pareto_plot <- ggplot(plot_lines, aes(day_share, rain_share, group = current_locality_name)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", linewidth = 0.6, colour = "#8C8C8C") +
+  geom_line(data = plot_lines %>% filter(curve == "Other localities"), colour = "#C7D1D5", linewidth = 0.55, alpha = 0.9) +
+  geom_line(data = plot_lines %>% filter(curve != "Other localities"), aes(colour = current_locality_name), linewidth = 1.15) +
+  scale_colour_manual(values = setNames(c("#D55E00", "#0072B2", "#009E73")[seq_along(label_names)], label_names), name = "Representative curves") +
+  scale_x_continuous(limits = c(0, 88), breaks = c(0, 10, 20, 40, 60, 80), labels = label_percent(scale = 1), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 100), breaks = c(0, 20, 40, 60, 80, 100), labels = label_percent(scale = 1), expand = c(0, 0)) +
+  labs(
+    title = "A small share of days produced most of Bangalore's rain",
+    subtitle = "May 1–September 30, 2026 · days sorted wettest to driest within each station · 28 stations",
+    x = "Share of complete days, starting with the wettest",
+    y = "Share of total rainfall accumulated",
+    caption = "Dashed = uniform rainfall across days; curves above it = concentration in wettest days. Grey = other stations; colour = representative curves. WeatherUnion observations."
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_minimal(base_size = 11) +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(colour = "#E7ECEE", linewidth = 0.35),
+    axis.line = element_line(colour = "#555555", linewidth = 0.35),
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(colour = "#666666"),
+    plot.caption = element_text(colour = "#666666", size = 8, hjust = 0),
+    plot.margin = margin(10, 10, 18, 10)
+  )
+pareto_plot
+ggsave(pareto_path, pareto_plot, width = 10.5, height = 7.4, dpi = 180, bg = "white")
+```
+
+## What it says
+
+```{r headline-facts, results='asis'}
+top <- facts %>% summarise(
+  top10 = median(rain_top_10pct),
+  top20 = median(rain_top_20pct),
+  top5 = median(rain_top_5pct),
+  min10 = min(rain_top_10pct), max10 = max(rain_top_10pct)
+)
+cat(sprintf("Across the 28 stations, the median wettest 10%% of complete days contributed %.1f%% of the season's rain; the median wettest 20%% contributed %.1f%%. At the station level, the top-10%% share ranged from %.1f%% to %.1f%%. These curves are therefore strongly bowed above the uniform diagonal, rather than close to a straight line.\n", top$top10, top$top20, top$min10, top$max10))
+```
+
+The exact concentration values for every station are in the `facts` table above. The chart is deliberately not a Lorenz curve: it begins with the wettest days, because the reader-facing question is how much rainfall is delivered by the most important rain days. The zero-rain days are included in the day denominator, which makes the curve answer “what share of all observed days generated what share of rain?”
+
+## Verdict
+
+Insightful: yes
+
+The Pareto view adds a useful second dimension to the heatmap: Bangalore's seasonal rain was not only spatially uneven, it was temporally concentrated. The main result is that a small fraction of wettest days generated a disproportionate share of each station's total, while the spread between curves shows that concentration itself varied by locality. This is suitable as a follow-up chart to the existing unpublished Substack draft, but the source remains one WeatherUnion season and 28 station records rather than a city-wide interpolated rainfall field.
+
+**Chart:** `docs/assets/analysis/bangalore-rain-variation-2026-pareto-curves.png`
+
+**Blog/Substack:** not modified. This is a draft analysis from chat; remote draft editing requires explicit approval.

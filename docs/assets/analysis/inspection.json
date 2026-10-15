@@ -1,0 +1,81 @@
+{
+  "schema_version": 3,
+  "artifact": {
+    "path": "/home/karthik/apps/bangalore-weather/docs/assets/analysis/bangalore-rain-variation-2026-daily-heatmap.png",
+    "sha256": "b1c8575a71f53b156e91d393b6cc02d38a926c1775cb83a1e06ba63b61fd8e84",
+    "bytes": 199105,
+    "width": 2160,
+    "height": 1710,
+    "format": "PNG",
+    "dpi": [
+      179.9844,
+      179.9844
+    ]
+  },
+  "layout_metadata": null,
+  "inspection_mode": "raster-only",
+  "delivery_profile": "chat",
+  "checks_complete": false,
+  "plan_checks": {
+    "frame": "not_supplied",
+    "placements": "not_supplied"
+  },
+  "geometry_status": "incomplete",
+  "display_width_px": null,
+  "passes_geometry_checks": false,
+  "width": 2160,
+  "height": 1710,
+  "text_clipped": false,
+  "annotation_overlaps": [],
+  "label_label_collisions": [],
+  "text_text_collisions": [],
+  "text_mark_collisions": [],
+  "legend_collisions": [],
+  "out_of_bounds_elements": [],
+  "clipped_text": [],
+  "long_unwrapped_annotations": [],
+  "undersized_text": [],
+  "low_contrast_elements": [],
+  "direct_label_coverage": [],
+  "redundant_value_axis": [],
+  "external_legend": [],
+  "unidentified_series": [],
+  "redundant_colour": [],
+  "minimum_text_margin_px": null,
+  "plot_utilization_ratio": null,
+  "occupied_utilization_ratio": null,
+  "panel_heights_px": [],
+  "min_panel_height_px": null,
+  "geometry_summary": {
+    "clip_px_max": 0.0,
+    "edge_overflow_px": {
+      "top": 0.0,
+      "bottom": 0.0,
+      "left": 0.0,
+      "right": 0.0
+    },
+    "min_panel_height_px": null,
+    "panels_squashed": false,
+    "worst_offenders": [],
+    "suggested_dims": null
+  },
+  "defects": [],
+  "correction_plan": {
+    "canvas": {
+      "defects": [],
+      "growth_vector": null,
+      "route": "refit_chart - grow the canvas by the vector; skip when growth_vector is null"
+    },
+    "placement": {
+      "defects": [],
+      "route": "place_on_marks / recommend_text_placement / recommend_labels - apply the exact per-defect move; do not hand the geometry back to the model"
+    },
+    "semantic": {
+      "defects": [],
+      "route": "model patch - re-express, recolour, reword, or make the design call"
+    }
+  },
+  "limitations": [
+    "No layout metadata supplied; collision, clipping, overflow, and text-margin checks are unknown"
+  ]
+}

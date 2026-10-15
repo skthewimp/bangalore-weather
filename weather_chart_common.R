@@ -132,7 +132,9 @@ build_rain_plot_data <- function(blrRain, curr_year) {
       Rain = as.numeric(Rain),
       DT = as.Date(DT)
     ) %>%
+    filter(DT < Sys.Date()) %>%
     summarise(Rain = sum(Rain), .by = DT) %>%
+    arrange(DT) %>%
     mutate(
       Year = year(DT),
       Month = month(DT),
@@ -264,7 +266,7 @@ build_temperature_legend <- function(temp_data, curr_year, title_y = NULL) {
       label = "NORMAL RANGE", hjust = 0.5, vjust = -0.2, family = "serif", fontface = "bold",
       size = 2.1, color = weather_palette$normal) +
     ggplot2::coord_cartesian(
-      xlim = c(legend_date - 12, legend_date + 12),
+      xlim = c(legend_date - 12, legend_date + 16),
       ylim = c(legend_row$RecordLow - legend_pad, legend_row$RecordHigh + legend_pad),
       expand = FALSE
     ) +
@@ -293,6 +295,30 @@ render_weather_chart <- function(temp_data,
     by = 4
   )
 
+  # Summarise dense record months rather than hiding overlapping daily labels.
+  temp_data %>%
+    filter(!is.na(Date), !is.na(RecordType)) %>%
+    group_by(Month, RecordType) %>%
+    summarise(
+      Date = Date[which.max(ifelse(RecordType == "high", ActualHigh, -ActualLow))],
+      record_label = if (n() == 1) stringr::str_wrap(first(Special), 14) else paste0(
+        n(), " daily ", first(RecordType), " records\nin ", month.name[first(Month)]
+      ),
+      .groups = "drop"
+    ) %>%
+    arrange(Date) %>%
+    group_by(RecordType) %>%
+    mutate(
+      label_nudge_x = if_else(as.numeric(lead(Date) - Date) <= 30, -12, 12, missing = 12)
+    ) %>%
+    ungroup() ->
+    temp_record_labels
+
+  temp_data %>%
+    filter(!is.na(Date)) %>%
+    left_join(temp_record_labels, by = c("Month", "RecordType", "Date")) %>%
+    mutate(record_label = coalesce(record_label, "")) -> temp_data
+
   temp_main <- ggplot2::ggplot(temp_data) +
     ggplot2::geom_vline(xintercept = month_starts, color = weather_palette$normal, linewidth = 0.3) +
     ggplot2::geom_rect(
@@ -310,27 +336,54 @@ render_weather_chart <- function(temp_data,
       fill = weather_palette$actual,
       color = NA
     ) +
+    # Offset leaders sideways so they cannot read as extensions of daily bars.
     ggrepel::geom_text_repel(
-      data = temp_data %>% filter(Special != "", RecordType == "high"),
-      ggplot2::aes(x = Date, y = pmax(ActualHigh, RecordHigh) + 0.8, label = stringr::str_wrap(Special, 14)),
+      data = temp_data,
+      ggplot2::aes(
+        x = Date,
+        y = RecordHigh,
+        label = ifelse(RecordType == "high" & !is.na(RecordType), record_label, "")
+      ),
+      direction = "y",
+      nudge_x = ifelse(temp_data$RecordType %in% "high" & temp_data$record_label != "", temp_data$label_nudge_x, 0),
+      nudge_y = 3,
+      max.overlaps = Inf,
       size = 2.5,
       family = "serif",
       color = weather_palette$text,
+      segment.color = weather_palette$text,
+      segment.size = 0.25,
+      segment.curvature = 0.2,
+      segment.ncp = 3,
+      segment.square = FALSE,
+      point.padding = 0.2,
       min.segment.length = 0,
       seed = 123,
       box.padding = 0.25
     ) +
     ggrepel::geom_text_repel(
-      data = temp_data %>% filter(Special != "", RecordType == "low"),
-      ggplot2::aes(x = Date, y = pmin(ActualLow, RecordLow) - 0.8, label = stringr::str_wrap(Special, 14)),
+      data = temp_data,
+      ggplot2::aes(
+        x = Date,
+        y = RecordLow,
+        label = ifelse(RecordType == "low" & !is.na(RecordType), record_label, "")
+      ),
+      direction = "y",
+      nudge_x = ifelse(temp_data$RecordType %in% "low" & temp_data$record_label != "", temp_data$label_nudge_x, 0),
+      nudge_y = -1.5,
+      max.overlaps = Inf,
       size = 2.5,
       family = "serif",
       color = weather_palette$text,
+      segment.color = weather_palette$text,
+      segment.size = 0.25,
+      segment.curvature = 0.2,
+      segment.ncp = 3,
+      segment.square = FALSE,
+      point.padding = 0.2,
       min.segment.length = 0,
       seed = 123,
-      box.padding = 0.25,
-      direction = "y",
-      nudge_y = -0.4
+      box.padding = 0.25
     ) +
     ggplot2::scale_x_date(
       "",
@@ -357,7 +410,7 @@ render_weather_chart <- function(temp_data,
   temp_legend <- build_temperature_legend(temp_data, curr_year)
   if (!is.null(temp_legend)) {
     temp_main <- temp_main +
-      patchwork::inset_element(temp_legend, left = 0.47, bottom = 0.12, right = 0.69, top = 0.30)
+      patchwork::inset_element(temp_legend, left = 0.47, bottom = 0.12, right = 0.73, top = 0.30)
   }
 
   rain_limit <- max(
@@ -370,14 +423,6 @@ render_weather_chart <- function(temp_data,
     na.rm = TRUE
   )
   rain_break_top <- max(50, ceiling(rain_limit / 50) * 50)
-
-  year_label_data <- rain_data %>%
-    filter(CumulRain > 0) %>%
-    slice_tail(n = 1) %>%
-    transmute(
-      x_year = DT + 3,
-      y_year = CumulRain
-    )
 
   month_end_labels <- rain_data %>%
     group_by(Month) %>%
@@ -408,6 +453,29 @@ render_weather_chart <- function(temp_data,
       actual_y
     )
 
+  # All rain labels share one collision solver, including the series name.
+  # Unlabelled curve points keep text clear of both plotted lines.
+  bind_rows(
+    rain_data %>%
+      transmute(x = DT, y = CumulRain, label = "", ink = weather_palette$actual),
+    rain_data %>%
+      transmute(x = DT, y = CumulMedian, label = "", ink = weather_palette$text),
+    month_end_labels %>%
+      filter(median_value > 0) %>%
+      transmute(x = median_x, y = median_y, label = as.character(median_value), ink = weather_palette$text),
+    month_end_labels %>%
+      filter(actual_value > 0) %>%
+      transmute(
+        x = actual_x,
+        y = actual_y,
+        label = ifelse(Month == max(rain_data$Month), paste("THIS YEAR", actual_value), as.character(actual_value)),
+        ink = weather_palette$actual
+      ),
+    rain_data %>%
+      filter(Label != "") %>%
+      transmute(x = DT, y = CumulRain, label = stringr::str_wrap(Label, 16), ink = weather_palette$text)
+  ) -> rain_labels
+
   rain_plot <- ggplot2::ggplot(rain_data, ggplot2::aes(x = DT, group = Month)) +
     ggplot2::geom_vline(xintercept = month_starts, color = weather_palette$normal, linewidth = 0.3) +
     ggplot2::geom_ribbon(
@@ -431,51 +499,22 @@ render_weather_chart <- function(temp_data,
     ) +
     ggplot2::geom_area(ggplot2::aes(y = CumulRain), fill = weather_palette$record, alpha = 0.28, color = NA) +
     ggplot2::geom_line(ggplot2::aes(y = CumulRain), color = weather_palette$actual, linewidth = 1.1, lineend = "butt") +
-    ggplot2::geom_text(
-      data = year_label_data,
-      ggplot2::aes(x = x_year, y = y_year, label = "THIS YEAR"),
-      inherit.aes = FALSE,
-      hjust = 0,
-      vjust = 0.25,
-      family = "serif",
-      fontface = "bold",
-      size = 2.7,
-      color = weather_palette$actual
-    ) +
-    ggplot2::geom_text(
-      data = month_end_labels %>% filter(median_value > 0),
-      ggplot2::aes(x = median_x, y = median_y, label = median_value),
-      inherit.aes = FALSE,
-      hjust = 1,
-      vjust = 0,
-      family = "serif",
-      fontface = "bold",
-      size = 2.4,
-      color = weather_palette$text,
-      alpha = 0.85
-    ) +
-    ggplot2::geom_text(
-      data = month_end_labels %>% filter(actual_value > 0),
-      ggplot2::aes(x = actual_x, y = actual_y, label = actual_value),
-      inherit.aes = FALSE,
-      hjust = 0,
-      vjust = 1,
-      family = "serif",
-      fontface = "bold",
-      size = 2.4,
-      color = weather_palette$actual
-    ) +
     ggrepel::geom_text_repel(
-      data = rain_data %>% filter(Label != ""),
-      ggplot2::aes(y = CumulRain, label = stringr::str_wrap(Label, 16)),
-      size = 2.3,
+      data = rain_labels,
+      ggplot2::aes(x = x, y = y, label = label, color = ink),
+      inherit.aes = FALSE,
+      size = 2.4,
       family = "serif",
       fontface = "bold",
-      color = weather_palette$text,
       seed = 123,
       min.segment.length = 0,
-      box.padding = 0.25
+      box.padding = 0.4,
+      point.padding = 0.15,
+      max.overlaps = Inf,
+      max.time = 3,
+      max.iter = 20000
     ) +
+    ggplot2::scale_color_identity() +
     ggplot2::scale_x_date(
       "",
       limits = c(as.Date(paste0(curr_year, "-01-01")), as.Date(paste0(curr_year, "-12-31"))),
@@ -485,13 +524,25 @@ render_weather_chart <- function(temp_data,
     ) +
     ggplot2::scale_y_continuous("", breaks = seq(0, rain_break_top, 50), expand = c(0, 0.02)) +
     weather_chart_theme(base_size = 10) +
-    ggplot2::annotate("text", x = as.Date(paste0(curr_year, "-01-05")),
-      y = rain_break_top * 0.965, label = "Precipitation",
-      hjust = 0, vjust = 1, family = "serif", fontface = "bold", size = 5, color = weather_palette$text) +
-    ggplot2::annotate("text", x = as.Date(paste0(curr_year, "-02-05")),
-      y = rain_break_top * 0.965,
-      label = "Cumulative monthly precipitation against historical percentile bands",
-      hjust = 0, vjust = 1, family = "serif", size = 3.2, color = weather_palette$text)
+    ggplot2::labs(
+      title = "Precipitation",
+      subtitle = "Cumulative monthly precipitation against historical percentile bands"
+    ) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        family = "serif",
+        face = "bold",
+        size = 14,
+        color = weather_palette$text,
+        margin = ggplot2::margin(b = 3)
+      ),
+      plot.subtitle = ggplot2::element_text(
+        family = "serif",
+        size = 9,
+        color = weather_palette$text,
+        margin = ggplot2::margin(b = 8)
+      )
+    )
 
   combined <- temp_main / rain_plot +
     patchwork::plot_layout(heights = c(7, 3)) +
@@ -499,20 +550,6 @@ render_weather_chart <- function(temp_data,
       title = title,
       subtitle = subtitle,
       caption = caption
-    ) +
-    ggplot2::theme(
-      plot.title = ggplot2::element_text(
-        family = "serif", face = "bold", size = 20, color = weather_palette$text, hjust = 0
-      ),
-      plot.subtitle = ggplot2::element_text(
-        family = "serif", size = 10.5, color = weather_palette$actual, hjust = 0,
-        margin = ggplot2::margin(t = 4, b = 10)
-      ),
-      plot.caption = ggplot2::element_text(
-        family = "serif", size = 9, color = weather_palette$text, hjust = 1
-      ),
-      plot.background = ggplot2::element_rect(fill = weather_palette$background, color = NA),
-      panel.background = ggplot2::element_rect(fill = weather_palette$background, color = NA)
     )
 
   combined
